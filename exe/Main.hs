@@ -1,14 +1,8 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 module Main where
-import System.Process hiding (runProcess)
-import Data.Monoid as M
-import System.Which
-import System.Posix.User
-import System.Posix.Types
-import System.Exit
 import Options.Applicative
 import Data.Semigroup ((<>))
+import Network.HostName
+import Helpers
 
 data Opts = Opts
     {
@@ -23,56 +17,6 @@ data Command
     | VM
     | VMWithBootLoader
     | DryActivate
-
-nixExePath :: FilePath
-nixExePath = $(staticWhich "nix")
-
-nixShellPath :: FilePath
-nixShellPath = $(staticWhich "nix-shell")
-
-nixInstPath :: FilePath
-nixInstPath = $(staticWhich "nix-instantiate")
-
-commonNixArgs :: [ String ]
-commonNixArgs = M.mconcat [
-    [ "--option", "sandbox", "true" ]
-                  ]
-runProcess :: FilePath -> [ String ] -> IO String
-runProcess com args = do
-    let args' = map (filter (/='"')) (args)
-        cmd = com
-    readCreateProcess ((proc cmd args')) ""
-
-buildSystemConfig :: String -> String -> String -> IO String
-buildSystemConfig flakepath name typ = do
-    let args = M.mconcat [
-                commonNixArgs,
-                [ "build", (flakepath ++ "#nixosConfigurations." ++ name ++ ".config.system.build." ++ typ) ],
-                [ "--no-link", "--print-out-paths" ]
-                ]
-    putStrLn ("Building System " ++ name)
-    runProcess (nixExePath) args
-
-switchToConfig :: String -> String -> IO String
-switchToConfig path arg = do
-    let path' = ((filter (/='\n')) path)
-    putStrLn ("Switching to " ++ path')
-    runProcess (path' ++ "/bin/switch-to-configuration") [ arg ]
-
-runVM :: String -> String -> IO String
-runVM path system = do
-    let path' = ((filter (/='\n')) path)
-    putStrLn ("Running VM.. ")
-    runProcess (path' ++ "/bin/run-" ++ system ++ "-vm") [ ]
-
-checkForUser :: CUid -> IO ()
-checkForUser a = do
-    root <- fmap (== a) getRealUserID
-    case root of
-      False -> do
-          putStrLn "Not Root, Exiting"
-          exitFailure
-      _ -> pure ()
 
 build :: String -> String -> String -> IO()
 build path name arg
@@ -98,8 +42,8 @@ build path name arg
        putStr vm
    | otherwise = do putStr "Need more arguments!"
 
-impl :: IO ()
-impl = do
+impl :: String -> IO ()
+impl hostname = do
     opts <- execParser optsParser
     case scommand opts of
       Build -> build (configpath opts) (nixsystem opts) "build"
@@ -121,7 +65,7 @@ impl = do
         programOptions :: Parser Opts
         programOptions =
            Opts <$> strOption (long "path" <> metavar "PATH" <> value "/etc/nixos" <> help "Path of configuration, Default: /etc/nixos") <*>
-               strOption (long "system" <> metavar "SYSTEM" <> help "Configuration name") <*>
+               strOption (long "system" <> metavar "SYSTEM" <> help "Configuration name" <> value hostname) <*>
                hsubparser (switchCommand <> buildCommand <> vmCommand <> vmWBLCommand <> dryCommand)
 
         switchCommand :: Mod CommandFields Command
@@ -153,4 +97,6 @@ impl = do
                 "dry-activate"
                 (info (pure DryActivate) (progDesc "Show what would have been done if activated"))
 main :: IO ()
-main = impl
+main = do
+    hostname <- getHostName
+    impl hostname
