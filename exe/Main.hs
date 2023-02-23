@@ -1,6 +1,5 @@
 module Main where
 import Options.Applicative
-import Data.Semigroup ((<>))
 import Network.HostName
 import Helpers
 
@@ -17,6 +16,11 @@ data Command
     | VM
     | VMWithBootLoader
     | DryActivate
+
+genCommandCli :: String -> String -> Command -> Mod CommandFields Command
+genCommandCli a b c = command
+                    a
+                        (info (pure c) (progDesc b))
 
 build :: String -> String -> String -> IO()
 build path name arg
@@ -40,7 +44,7 @@ build path name arg
        sysbuild <- buildSystemConfig path name "vmWithBootLoader"
        vm <- runVM sysbuild name
        putStr vm
-   | otherwise = do putStr "Need more arguments!"
+   | otherwise = pure ()
 
 impl :: String -> IO ()
 impl hostname = do
@@ -64,38 +68,39 @@ impl hostname = do
 
         programOptions :: Parser Opts
         programOptions =
-           Opts <$> strOption (long "path" <> metavar "PATH" <> value "/etc/nixos" <> help "Path of configuration, Default: /etc/nixos") <*>
-               strOption (long "system" <> metavar "SYSTEM" <> help "Configuration name" <> value hostname) <*>
-               hsubparser (switchCommand <> buildCommand <> vmCommand <> vmWBLCommand <> dryCommand)
+           Opts <$> strOption (long "path" <>
+                               metavar "PATH" <>
+                               value "/etc/nixos" <>
+                               help "Path of configuration" <>
+                               showDefault) <*>
+
+                    strOption (long "system" <>
+                               metavar "SYSTEM" <>
+                               help "Configuration name" <>
+                               showDefault <>
+                               value hostname) <*>
+
+                    hsubparser (switchCommand <>
+                                buildCommand <>
+                                vmCommand <>
+                                vmWBLCommand <>
+                                dryCommand)
 
         switchCommand :: Mod CommandFields Command
-        switchCommand =
-            command "switch"
-                (info (pure Switch) (progDesc "Switch to configuration"))
+        switchCommand = genCommandCli "switch" "Switch to configuration" Switch
 
         buildCommand :: Mod CommandFields Command
-        buildCommand =
-            command
-                "build"
-                (info (pure Build) (progDesc "Build configuration"))
+        buildCommand = genCommandCli "build" "Build Configuration" Build
 
         vmCommand :: Mod CommandFields Command
-        vmCommand =
-            command
-                "vm"
-                (info (pure VM) (progDesc "Build VM"))
+        vmCommand = genCommandCli "vm" "Build VM" VM
 
         vmWBLCommand :: Mod CommandFields Command
-        vmWBLCommand =
-            command
-                "vm-with-bootloader"
-                (info (pure VMWithBootLoader) (progDesc "Build VM with bootloader"))
+        vmWBLCommand = genCommandCli "vm-with-bootloader" "Build VM with Bootloader" VMWithBootLoader
 
         dryCommand :: Mod CommandFields Command
-        dryCommand =
-            command
-                "dry-activate"
-                (info (pure DryActivate) (progDesc "Show what would have been done if activated"))
+        dryCommand = genCommandCli "dry-activate" "Show what would have been done if activated" DryActivate
+
 main :: IO ()
 main = do
     hostname <- getHostName
