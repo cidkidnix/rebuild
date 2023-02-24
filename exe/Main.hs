@@ -7,6 +7,7 @@ import Network.HostName
 import System.Exit
 import Cli.Extras
 import Control.Monad.IO.Class
+import qualified Data.Text as T
 import Helpers
 
 data Opts = Opts
@@ -23,6 +24,7 @@ data Command
     | VM
     | VMWithBootLoader
     | DryActivate
+    | Deploy String String String Bool
     | NixOSInstall String Bool
 
 genCommandCli :: String -> String -> Command -> Mod CommandFields Command
@@ -61,6 +63,23 @@ build path name arg
        pure ()
    | otherwise = pure ()
 
+deployConfig :: NixRun e m => Bool -> String -> String -> String -> String -> String -> m ()
+deployConfig doSign path name host port key = do
+    build <- buildSystemConfig path name "toplevel"
+
+    _ <- case doSign of
+      True -> signClosures build key
+      False -> return "Nothing"
+
+    _ <- copyDeployment port host name build
+
+    let build' = ((filter (/='\n')) build)
+
+    _ <- withSpinner ("Switching " <> (T.pack host) <> " to " <> (T.pack build)) $ do
+        runProcessWithSSH port host [ "-t" ] [ (build' <> "/bin/switch-to-configuration"), "switch" ]
+
+    pure ()
+
 impl :: String -> IO ()
 impl hostname = do
     opts <- execParser optsParser
@@ -74,6 +93,7 @@ impl hostname = do
       VMWithBootLoader -> build (configpath opts) (nixsystem opts) "vm-with-bootloader"
       DryActivate -> build (configpath opts) (nixsystem opts) "dry-activate"
       NixOSInstall root pass -> pure ()
+      Deploy sys port key doSign -> deployConfig doSign (configpath opts) (nixsystem opts) sys port key
           --installNixOS (configpath opts) (nixsystem opts) root pass
     where
         optsParser :: ParserInfo Opts
@@ -109,7 +129,8 @@ impl hostname = do
                                 vmCommand <>
                                 vmWBLCommand <>
                                 dryCommand <>
-                                nixInstall)
+                                nixInstall <>
+                                deploy)
 
         switchCommand :: Mod CommandFields Command
         switchCommand = genCommandCli "switch" "Switch to configuration" Switch
@@ -125,6 +146,18 @@ impl hostname = do
 
         dryCommand :: Mod CommandFields Command
         dryCommand = genCommandCli "dry-activate" "Show what would have been done if activated" DryActivate
+
+        deploy :: Mod CommandFields Command
+        deploy = command
+            "deploy"
+            (info deployOpts (progDesc "Install NixOS"))
+
+        deployOpts :: Parser Command
+        deployOpts = Deploy <$>
+            strArgument (metavar "Where to deploy" <> help "Where to install NixOS to") <*>
+            strOption (long "port" <> value "22" <> metavar "SSH port") <*>
+            strOption (long "key" <> value "example" <> metavar "Signing Key") <*>
+            switch (long "sign")
 
         nixInstall :: Mod CommandFields Command
         nixInstall = command

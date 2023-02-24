@@ -12,6 +12,9 @@ module Helpers (checkForUser,
                         switchToConfig,
                         runVM,
                         nixRun,
+                        runProcessWithSSH,
+                        copyDeployment,
+                        signClosures,
                         NixRun
                        ) where
 import Data.Monoid as M
@@ -26,6 +29,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Catch
 import Control.Monad.Fail
 import qualified Data.Text as T
+import Data.List as L
 
 data NixError =
     P ProcessFailure | T T.Text
@@ -61,6 +65,9 @@ nixRun severity action = do
 nixExePath :: FilePath
 nixExePath = $(staticWhich "nix")
 
+sshExePath :: FilePath
+sshExePath = $(staticWhich "ssh")
+
 commonNixArgs :: [ String ]
 commonNixArgs = M.mconcat [
     [ "--option", "sandbox", "true" ]
@@ -71,6 +78,32 @@ runProcess com args = do
     let args' = map (filter (/='"')) (args)
         cmd = com
     fmap T.unpack $ readProcessAndLogOutput (Debug, Debug) (proc cmd args')
+
+runProcessWithSSH :: NixRun e m => String -> String -> [ String ] -> [ String ] -> m String
+runProcessWithSSH port host sargs com = do
+    let sargs' = map (filter (/='"')) (sargs)
+        pargs' = L.intercalate " " com
+        --(map (filter (/='"')) (pargs))
+        cmd = sshExePath
+        args' = M.mconcat [
+                    sargs',
+                    [ host, "-p", port ]
+                   , [ pargs' ]
+                ]
+    fmap T.unpack $ readProcessAndLogOutput (Debug, Debug) (proc cmd args')
+
+signClosures :: NixRun e m => String -> String -> m String
+signClosures path key = do
+    let outpath' = ((filter (/='\n')) path)
+    withSpinner ("Signing path " <> (T.pack path)) $ do
+        runProcess nixExePath [ "store", "sign", "-k", key, outpath' ]
+
+copyDeployment :: NixRun e m => String -> String -> String -> String -> m String
+copyDeployment port host name outpath = do
+    let outpath' = ((filter (/='\n')) outpath)
+        nixhost = "ssh-ng://" <> host
+    withSpinner ("Copying Deployment for " <> (T.pack name)) $ do
+        runProcess nixExePath [ "copy", "-s", "--to", nixhost, outpath', "--no-check-sigs" ]
 
 buildSystemConfig :: NixRun e m => String -> String -> String -> m String
 buildSystemConfig flakepath name typ = do
