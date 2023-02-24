@@ -1,6 +1,7 @@
 module Main where
 import Options.Applicative
 import Network.HostName
+import System.Exit
 import Helpers
 
 data Opts = Opts
@@ -16,11 +17,19 @@ data Command
     | VM
     | VMWithBootLoader
     | DryActivate
+    | NixOSInstall String Bool
 
 genCommandCli :: String -> String -> Command -> Mod CommandFields Command
 genCommandCli a b c = command
                     a
                         (info (pure c) (progDesc b))
+
+installNixOS :: String -> String -> String -> Bool -> IO ()
+installNixOS path name root nopass = do
+    putStrLn (path ++ name ++ root)
+    putStrLn "Not implemented!"
+    print nopass
+    exitFailure
 
 build :: String -> String -> String -> IO()
 build path name arg
@@ -55,6 +64,7 @@ impl hostname = do
       Switch -> build (configpath opts) (nixsystem opts) "switch"
       VMWithBootLoader -> build (configpath opts) (nixsystem opts) "vm-with-bootloader"
       DryActivate -> build (configpath opts) (nixsystem opts) "dry-activate"
+      NixOSInstall root pass -> installNixOS (configpath opts) (nixsystem opts) root pass
     where
         optsParser :: ParserInfo Opts
         optsParser = info
@@ -64,17 +74,19 @@ impl hostname = do
                     "rebuild -- Rebuild your NixOS system!")
 
         versionOption :: Parser (a -> a)
-        versionOption = infoOption "0.1" (long "version" <> help "Show version")
+        versionOption = infoOption "0.1" (long "version" <> short 'v' <> help "Show version")
 
         programOptions :: Parser Opts
         programOptions =
            Opts <$> strOption (long "path" <>
+                               short 'p' <>
                                metavar "PATH" <>
                                value "/etc/nixos" <>
                                help "Path of configuration" <>
                                showDefault) <*>
 
                     strOption (long "system" <>
+                               short 's' <>
                                metavar "SYSTEM" <>
                                help "Configuration name" <>
                                showDefault <>
@@ -84,7 +96,8 @@ impl hostname = do
                                 buildCommand <>
                                 vmCommand <>
                                 vmWBLCommand <>
-                                dryCommand)
+                                dryCommand <>
+                                nixInstall)
 
         switchCommand :: Mod CommandFields Command
         switchCommand = genCommandCli "switch" "Switch to configuration" Switch
@@ -100,6 +113,16 @@ impl hostname = do
 
         dryCommand :: Mod CommandFields Command
         dryCommand = genCommandCli "dry-activate" "Show what would have been done if activated" DryActivate
+
+        nixInstall :: Mod CommandFields Command
+        nixInstall = command
+            "install"
+            (info nixInstallOpts (progDesc "Install NixOS"))
+
+        nixInstallOpts :: Parser Command
+        nixInstallOpts = NixOSInstall <$>
+            strArgument (metavar "ROOT" <> help "Where to install NixOS to") <*>
+            switch (long "no-root-password" <> help "Install with no root password")
 
 main :: IO ()
 main = do
