@@ -1,13 +1,19 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 import Options.Applicative
 import Network.HostName
 import System.Exit
+import Cli.Extras
+import Control.Monad.IO.Class
 import Helpers
 
 data Opts = Opts
     {
       configpath :: !String,
       nixsystem :: !String,
+      verbose :: !Bool,
       scommand :: !Command
     }
 
@@ -31,40 +37,44 @@ installNixOS path name root nopass = do
     print nopass
     exitFailure
 
-build :: String -> String -> String -> IO()
+build :: NixRun e m => String -> String -> String -> m ()
 build path name arg
    | arg <= "build" = do
-       sysbuild <- buildSystemConfig path name "toplevel"
-       putStr sysbuild
+       _ <- buildSystemConfig path name "toplevel"
+       pure ()
    | arg <= "switch" = do
        checkForUser 0
        sysbuild <- buildSystemConfig path name "toplevel"
-       nixswitch <- switchToConfig sysbuild arg
-       putStr nixswitch
+       _ <- switchToConfig sysbuild arg
+       pure ()
    | arg <= "dry-activate" = do
        sysbuild <- buildSystemConfig path name "toplevel"
-       nixswitch <- switchToConfig sysbuild arg
-       putStr nixswitch
+       _ <- switchToConfig sysbuild arg
+       pure ()
    | arg <= "vm" = do
        sysbuild <- buildSystemConfig path name "vm"
-       vm <- runVM sysbuild name
-       putStr vm
+       _ <- runVM sysbuild name
+       pure ()
    | arg <= "vm-with-bootloader" = do
        sysbuild <- buildSystemConfig path name "vmWithBootLoader"
-       vm <- runVM sysbuild name
-       putStr vm
+       _ <- runVM sysbuild name
+       pure ()
    | otherwise = pure ()
 
 impl :: String -> IO ()
 impl hostname = do
     opts <- execParser optsParser
-    case scommand opts of
+    let severity = case verbose opts of
+                    True -> Debug
+                    False -> Informational
+    nixRun severity $ case scommand opts of
       Build -> build (configpath opts) (nixsystem opts) "build"
       VM -> build (configpath opts) (nixsystem opts) "vm"
       Switch -> build (configpath opts) (nixsystem opts) "switch"
       VMWithBootLoader -> build (configpath opts) (nixsystem opts) "vm-with-bootloader"
       DryActivate -> build (configpath opts) (nixsystem opts) "dry-activate"
-      NixOSInstall root pass -> installNixOS (configpath opts) (nixsystem opts) root pass
+      NixOSInstall root pass -> pure ()
+          --installNixOS (configpath opts) (nixsystem opts) root pass
     where
         optsParser :: ParserInfo Opts
         optsParser = info
@@ -91,6 +101,8 @@ impl hostname = do
                                help "Configuration name" <>
                                showDefault <>
                                value hostname) <*>
+
+                    switch (long "verbose") <*>
 
                     hsubparser (switchCommand <>
                                 buildCommand <>

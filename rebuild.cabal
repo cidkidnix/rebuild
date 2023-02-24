@@ -57,9 +57,12 @@ common warnings
 library
   import: warnings
   build-depends:    base ^>=4.16.3.0,
-                    process,
                     which,
-                    unix
+                    unix,
+                    cli-extras,
+                    lens,
+                    text,
+                    exceptions
 
   exposed-modules: Helpers
   hs-source-dirs: src
@@ -82,7 +85,8 @@ executable rebuild
     build-depends:    base ^>=4.16.3.0,
                       hostname,
                       optparse-applicative,
-                      rebuild
+                      rebuild,
+                      cli-extras
 
 
     -- Directories containing source files.
