@@ -6,7 +6,6 @@ import Options.Applicative
 import Network.HostName
 import System.Exit
 import Cli.Extras
-import Control.Monad.IO.Class
 import qualified Data.Text as T
 import Helpers
 
@@ -65,17 +64,17 @@ build path name arg
 
 deployConfig :: NixRun e m => Bool -> String -> String -> String -> String -> String -> m ()
 deployConfig doSign path name host port key = do
-    build <- buildSystemConfig path name "toplevel"
+    sysbuild <- buildSystemConfig path name "toplevel"
 
     _ <- case doSign of
-      True -> signClosures build key
+      True -> signClosures sysbuild key
       False -> return "Nothing"
 
-    _ <- copyDeployment port host name build
+    _ <- copyDeployment port host name sysbuild
 
-    let build' = ((filter (/='\n')) build)
+    let build' = ((filter (/='\n')) sysbuild)
 
-    _ <- withSpinner ("Switching " <> (T.pack host) <> " to " <> (T.pack build)) $ do
+    _ <- withSpinner ("Switching " <> (T.pack host) <> " to " <> (T.pack build')) $ do
         runProcessWithSSH port host [ "-t" ] [ (build' <> "/bin/switch-to-configuration"), "switch" ]
 
     pure ()
@@ -150,7 +149,7 @@ impl hostname = do
         deploy :: Mod CommandFields Command
         deploy = command
             "deploy"
-            (info deployOpts (progDesc "Install NixOS"))
+            (info deployOpts (progDesc "Deploy NixOS to a machine"))
 
         deployOpts :: Parser Command
         deployOpts = Deploy <$>

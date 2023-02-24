@@ -17,6 +17,7 @@
       rebuild = pkgs.haskell.lib.overrideCabal (pkgs.haskellPackages.callCabal2nix "rebuild" ./. { }) {
         librarySystemDepends = [
           pkgs.nix
+          pkgs.openssh
         ];
       };
     });
