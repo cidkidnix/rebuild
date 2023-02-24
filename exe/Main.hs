@@ -39,28 +39,28 @@ installNixOS path name root nopass = do
     exitFailure
 
 build :: NixRun e m => String -> String -> String -> m ()
-build path name arg
-   | arg <= "build" = do
+build path name arg = case arg of
+   "build" -> do
        _ <- buildSystemConfig path name "toplevel"
        pure ()
-   | arg <= "switch" = do
+   "switch" -> do
        checkForUser 0
        sysbuild <- buildSystemConfig path name "toplevel"
        _ <- switchToConfig sysbuild arg
        pure ()
-   | arg <= "dry-activate" = do
+   "dry-activate" -> do
        sysbuild <- buildSystemConfig path name "toplevel"
        _ <- switchToConfig sysbuild arg
        pure ()
-   | arg <= "vm" = do
+   "vm" -> do
        sysbuild <- buildSystemConfig path name "vm"
        _ <- runVM sysbuild name
        pure ()
-   | arg <= "vm-with-bootloader" = do
+   "vm-with-bootloader" -> do
        sysbuild <- buildSystemConfig path name "vmWithBootLoader"
        _ <- runVM sysbuild name
        pure ()
-   | otherwise = pure ()
+   _ -> pure ()
 
 deployConfig :: NixRun e m => Bool -> String -> String -> String -> String -> String -> m ()
 deployConfig doSign path name host port key = do
