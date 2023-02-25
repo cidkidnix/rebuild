@@ -4,17 +4,19 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Helpers (checkForUser,
+module Rebuild.Helpers (checkForUser,
                         nixExePath,
                         commonNixArgs,
                         runProcess,
-                        buildSystemConfig,
-                        switchToConfig,
-                        runVM,
+                        runChroot,
                         nixRun,
                         runProcessWithSSH,
                         copyDeployment,
                         signClosures,
+                        setupDir,
+                        cleanUpDir,
+                        withChroot,
+                        filterNixString,
                         NixRun
                        ) where
 import Data.Monoid as M
@@ -24,12 +26,12 @@ import System.Posix.Types
 import System.Exit
 import Control.Lens
 import Cli.Extras
-import Cli.Extras.Logging
 import Control.Monad.IO.Class
 import Control.Monad.Catch
-import Control.Monad.Fail
 import qualified Data.Text as T
 import Data.List as L
+import System.Linux.Mount
+import System.Directory
 
 data NixError =
     P ProcessFailure | T T.Text
@@ -73,15 +75,20 @@ commonNixArgs = M.mconcat [
     [ "--option", "sandbox", "true" ]
                   ]
 
+filterNixString :: String -> String
+filterNixString a = do
+    let a' = (filter (/='"')) (a)
+    (filter (/='\n')) (a')
+
 runProcess :: NixRun e m => FilePath -> [ String ] -> m String
 runProcess com args = do
-    let args' = map (filter (/='"')) (args)
+    let args' = map (filterNixString) (args)
         cmd = com
     fmap T.unpack $ readProcessAndLogOutput (Debug, Debug) (proc cmd args')
 
 runProcessWithSSH :: NixRun e m => String -> String -> [ String ] -> [ String ] -> m String
 runProcessWithSSH port host sargs com = do
-    let sargs' = map (filter (/='"')) (sargs)
+    let sargs' = map (filterNixString) (sargs)
         pargs' = L.intercalate " " com
         --(map (filter (/='"')) (pargs))
         cmd = sshExePath
@@ -92,40 +99,43 @@ runProcessWithSSH port host sargs com = do
                 ]
     fmap T.unpack $ readProcessAndLogOutput (Debug, Debug) (proc cmd args')
 
+withChroot :: NixRun e m => FilePath -> FilePath -> [[ String ]] -> m ()
+withChroot path sh com = mapM_ (\x -> runChroot path sh x) com
+
 signClosures :: NixRun e m => String -> String -> m String
 signClosures path key = do
-    let outpath' = ((filter (/='\n')) path)
+    let outpath' = (filterNixString path)
     withSpinner ("Signing path " <> (T.pack path)) $ do
         runProcess nixExePath [ "store", "sign", "-k", key, outpath' ]
 
 copyDeployment :: NixRun e m => String -> String -> String -> String -> m String
-copyDeployment port host name outpath = do
-    let outpath' = ((filter (/='\n')) outpath)
-        nixhost = "ssh-ng://" <> host
+copyDeployment host name outpath uri = do
+    let outpath' = (filterNixString outpath)
+        nixhost = uri <> host
     withSpinner ("Copying Deployment for " <> (T.pack name)) $ do
         runProcess nixExePath [ "copy", "-s", "--to", nixhost, outpath', "--no-check-sigs" ]
 
-buildSystemConfig :: NixRun e m => String -> String -> String -> m String
-buildSystemConfig flakepath name typ = do
-    let args = M.mconcat [
-                commonNixArgs,
-                [ "build", (flakepath <> "#nixosConfigurations." <> name <> ".config.system.build." <> typ) ],
-                [ "--no-link", "--print-out-paths" ]
-                ]
-    withSpinner ("Building System " <> (T.pack name)) $ do
-        runProcess (nixExePath) args
+runChroot :: NixRun e m => String -> FilePath -> [ String ] -> m String
+runChroot path sh com = do
+    let command = L.intercalate " " com
+        args' = M.mconcat [
+                [ path, sh, "-c", command ]
+                          ]
+    runProcess "chroot" args'
 
-switchToConfig :: NixRun e m => String -> String -> m String
-switchToConfig path arg = do
-    let path' = ((filter (/='\n')) path)
-    withSpinner ("Switching to " <> (T.pack path')) $ do
-        runProcess (path' <> "/bin/switch-to-configuration") [ arg ]
+setupDir :: FilePath -> FilePath -> IO ()
+setupDir root mountpoint = do
+    createDirectoryIfMissing True (mountpoint <> "/" <> "etc")
+    writeFile (mountpoint <> "/etc/NIXOS") ""
+    createDirectoryIfMissing True (mountpoint <> "/" <> "dev")
+    createDirectoryIfMissing True (mountpoint <> "/" <> "sys")
+    rBind (root <> "dev") (mountpoint <> "/" <> "dev")
+    rBind (root <> "sys") (mountpoint <> "/" <> "sys")
 
-runVM :: NixRun e m => String -> String -> m String
-runVM path sys = do
-    let path' = ((filter (/='\n')) path)
-    withSpinner ("Running VM.. ") $ do
-        runProcess (path' <> "/bin/run-" <> sys <> "-vm") [ ]
+cleanUpDir :: FilePath -> IO ()
+cleanUpDir mountpoint = do
+    umountWith Detach Follow (mountpoint <> "sys")
+    umountWith Detach Follow (mountpoint <> "dev")
 
 checkForUser :: NixRun e m => CUid -> m ()
 checkForUser a = do
