@@ -90,7 +90,6 @@ runProcessWithSSH :: NixRun e m => String -> String -> [ String ] -> [ String ] 
 runProcessWithSSH port host sargs com = do
     let sargs' = map (filterNixString) (sargs)
         pargs' = L.intercalate " " com
-        --(map (filter (/='"')) (pargs))
         cmd = sshExePath
         args' = M.mconcat [
                     sargs',

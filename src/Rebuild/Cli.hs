@@ -22,6 +22,7 @@
 import Options.Applicative
 import Rebuild.Builders
 import Rebuild.Helpers
+import qualified Data.Text as T
 import Cli.Extras
 
 
@@ -129,7 +130,8 @@ nixInstallOpts = NixOSInstall <$>
 build :: NixRun e m => String -> String -> String -> m ()
 build path name arg = case arg of
    "build" -> do
-       _ <- buildSystemConfig path name "toplevel"
+       sysbuild <- buildSystemConfig path name "toplevel"
+       putLog (Informational) ("System Closure at " <> (T.pack sysbuild))
        pure ()
    "switch" -> do
        checkForUser 0
@@ -168,6 +170,6 @@ impl hostname = do
       VMWithBootLoader -> build (configpath opts) (nixsystem opts) "vm-with-bootloader"
       DryActivate -> build (configpath opts) (nixsystem opts) "dry-activate"
       Boot -> build (configpath opts) (nixsystem opts) "boot"
-      NixOSInstall root pass -> installConfig root pass (configpath opts) (nixsystem opts)
+      NixOSInstall root pass -> installToDir root pass (configpath opts) (nixsystem opts)
       Deploy sys port key doSign -> deployConfig doSign (configpath opts) (nixsystem opts) sys port key
 

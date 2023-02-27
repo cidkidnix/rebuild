@@ -7,7 +7,7 @@
 module Rebuild.Builders (buildSystemConfig
                         ,switchToConfig
                         ,runVM
-                        ,installConfig
+                        ,installToDir
                         ,deployConfig)
 where
 import Data.Monoid as M
@@ -38,8 +38,8 @@ runVM path sys = do
     withSpinner ("Running VM.. ") $ do
         runProcess (path' <> "/bin/run-" <> sys <> "-vm") [ ]
 
-installConfig :: NixRun e m => String -> Bool -> String -> String -> m ()
-installConfig root pass path name = do
+installToDir :: NixRun e m => String -> Bool -> String -> String -> m ()
+installToDir root pass path name = do
     checkForUser 0
     sysbuild <- buildSystemConfig path name "toplevel"
     _ <- copyDeployment root name sysbuild ""
@@ -47,13 +47,13 @@ installConfig root pass path name = do
     liftIO $ setupDir "/" root
 
     case pass of
-      False -> putLog (Warning) ("No root")
+      False -> putLog (Warning) ("Not setting root password")
       _ -> pure ()
 
     putLog (Informational) ("Running chroot for " <> (T.pack root))
     let sysbuild' = filterNixString sysbuild
     _ <- withChroot root (sysbuild' <> "/sw/bin/bash") [
-            [ (sysbuild' <> "/bin/switch-to-configuration"), "boot" ]
+            [ (sysbuild' <> "/bin/switch-to-configuration"), "switch" ]
         ]
     liftIO $ cleanUpDir root
     pure ()
