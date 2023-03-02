@@ -41,6 +41,7 @@ data Command
     | VMWithBootLoader
     | DryActivate
     | Boot
+    | BuildISO
     | Deploy String String String Bool
     | NixOSInstall String Bool
 
@@ -83,6 +84,7 @@ programOptions hostname =
                           vmWBLCommand <>
                           dryCommand <>
                           bootCommand <>
+                          buildISOCommand <>
                           nixInstall <>
                           deploy)
 
@@ -103,6 +105,9 @@ dryCommand = genCommandCli "dry-activate" "Show what would have been done if act
 
 bootCommand :: Mod CommandFields Command
 bootCommand = genCommandCli "boot" "Build Configuration but down switch" Boot
+
+buildISOCommand :: Mod CommandFields Command
+buildISOCommand = genCommandCli "build-iso" "Build ISO image" BuildISO
 
 deploy :: Mod CommandFields Command
 deploy = command
@@ -155,6 +160,10 @@ build path name arg = case arg of
        sysbuild <- buildSystemConfig path name "vmWithBootLoader"
        _ <- runVM sysbuild name
        pure ()
+   "build-iso" -> do
+       sysbuild <- buildSystemConfig path name "isoImage"
+       putLog (Informational) ("ISO image at " <> (T.pack sysbuild))
+       pure ()
    _ -> pure ()
 
 impl :: String -> IO ()
@@ -170,6 +179,7 @@ impl hostname = do
       VMWithBootLoader -> build (configpath opts) (nixsystem opts) "vm-with-bootloader"
       DryActivate -> build (configpath opts) (nixsystem opts) "dry-activate"
       Boot -> build (configpath opts) (nixsystem opts) "boot"
+      BuildISO -> build (configpath opts) (nixsystem opts) "build-iso"
       NixOSInstall root pass -> installToDir root pass (configpath opts) (nixsystem opts)
       Deploy sys port key doSign -> deployConfig doSign (configpath opts) (nixsystem opts) sys port key
 
