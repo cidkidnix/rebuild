@@ -11,6 +11,7 @@ module Rebuild.Builders
     runVM,
     installToDir,
     deployConfig,
+    addSystem,
   )
 where
 
@@ -19,6 +20,17 @@ import Control.Monad.IO.Class
 import Data.Monoid as M
 import qualified Data.Text as T
 import Rebuild.Helpers
+
+addSystem :: NixRun e m => String -> String -> String -> m String
+addSystem flakepath name typ = do
+  let args =
+        M.mconcat
+          [ commonNixArgs,
+            ["build"],
+            ["--no-link", "--print-out-paths", "--profile", "/nix/var/nix/profiles/system", (flakepath <> "#nixosConfigurations." <> name <> ".config.system.build." <> typ)]
+          ]
+  withSpinner ("Building System " <> (T.pack name)) $ do
+    runProcess (nixExePath) args
 
 buildSystemConfig :: NixRun e m => String -> String -> String -> m String
 buildSystemConfig flakepath name typ = do
@@ -34,6 +46,7 @@ buildSystemConfig flakepath name typ = do
 switchToConfig :: NixRun e m => String -> String -> m String
 switchToConfig path arg = do
   let path' = (filterNixString path)
+
   withSpinner ("Switching to " <> (T.pack path')) $ do
     runProcess (path' <> "/bin/switch-to-configuration") [arg]
 

@@ -20,6 +20,7 @@ module Rebuild.Helpers
     withChroot,
     filterNixString,
     NixRun,
+    nixEnvPath,
   )
 where
 
@@ -75,6 +76,9 @@ nixExePath = $(staticWhich "nix")
 
 sshExePath :: FilePath
 sshExePath = $(staticWhich "ssh")
+
+nixEnvPath :: FilePath
+nixEnvPath = $(staticWhich "nix-env")
 
 commonNixArgs :: [String]
 commonNixArgs =

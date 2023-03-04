@@ -152,12 +152,12 @@ build path name arg = case arg of
     pure ()
   "switch" -> do
     checkForUser 0
-    sysbuild <- buildSystemConfig path name "toplevel"
+    sysbuild <- addSystem path name "toplevel"
     _ <- switchToConfig sysbuild arg
     pure ()
   "boot" -> do
     checkForUser 0
-    sysbuild <- buildSystemConfig path name "toplevel"
+    sysbuild <- addSystem path name "toplevel"
     _ <- switchToConfig sysbuild arg
     pure ()
   "dry-activate" -> do

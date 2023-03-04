@@ -1,0 +1,7 @@
+cradle:
+  cabal:
+    - path: "./src"
+      component: "lib:rebuild"
+
+    - path: "./exe/Main.hs"
+      component: "rebuild:exe:rebuild"
