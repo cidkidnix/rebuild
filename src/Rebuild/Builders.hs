@@ -24,7 +24,7 @@ addSystem flakepath name profile typ = do
         M.mconcat
           [ commonNixArgs,
             ["build"],
-            ["--no-link", "--print-out-paths", "--profile", profile, flakepath <> "#nixosConfigurations." <> name <> ".config.system.build." <> typ]
+            nixOSBuildargs flakepath name typ profile
           ]
   withSpinner ("Building System " <> T.pack name <> " and adding to profile " <> T.pack profile) $ do
     runProcess nixExePath args

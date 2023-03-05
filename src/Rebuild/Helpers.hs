@@ -10,19 +10,16 @@ module Rebuild.Helpers
     nixExePath,
     commonNixArgs,
     runProcess,
-    runChroot,
     nixRun,
     runProcessWithSSH,
     copyDeployment,
     signClosures,
-    setupDir,
-    cleanUpDir,
-    withChroot,
     withSSH,
     filterNixString,
     NixRun,
     nixEnvPath,
     nixOSBuildargs,
+    nixDarwinBuildargs,
   )
 where
 
@@ -90,6 +87,9 @@ commonNixArgs =
 nixOSBuildargs :: String -> String -> String -> String -> [String]
 nixOSBuildargs flakepath name typ profile = ["--no-link", "--print-out-paths", "--profile", profile, flakepath <> "#nixosConfigurations." <> name <> ".config.system.build." <> typ]
 
+nixDarwinBuildargs :: String -> String -> String -> String -> [String]
+nixDarwinBuildargs flakepath name typ profile = ["--no-link", "--print-out-paths", "--profile", profile, flakepath <> "#darwinConfigurations" <> name <> ".config.system.build." <> typ]
+
 filterNixString :: String -> String
 filterNixString a = do
   let a' = filter (/= '"') a
@@ -114,9 +114,6 @@ runProcessWithSSH port host sargs com = do
           ]
   T.unpack <$> readProcessAndLogOutput (Debug, Debug) (proc cmd args')
 
-withChroot :: NixRun e m => FilePath -> FilePath -> [[String]] -> m ()
-withChroot path sh com = mapM_ (\x -> runChroot path sh x) com
-
 withSSH :: NixRun e m => String -> String -> [String] -> [[String]] -> m ()
 withSSH port host sargs com = mapM_ (\x -> runProcessWithSSH port host sargs x) com
 
@@ -132,29 +129,6 @@ copyDeployment host name outpath uri = do
       nixhost = uri <> host
   withSpinner ("Copying Deployment for " <> T.pack name) $ do
     runProcess nixExePath ["copy", "-s", "--to", nixhost, outpath', "--no-check-sigs"]
-
-runChroot :: NixRun e m => String -> FilePath -> [String] -> m String
-runChroot path sh com = do
-  let command = unwords com
-      args' =
-        M.mconcat
-          [ [path, sh, "-c", command]
-          ]
-  runProcess "chroot" args'
-
-setupDir :: FilePath -> FilePath -> IO ()
-setupDir root mountpoint = do
-  createDirectoryIfMissing True (mountpoint <> "/" <> "etc")
-  writeFile (mountpoint <> "/etc/NIXOS") ""
-  createDirectoryIfMissing True (mountpoint <> "/" <> "dev")
-  createDirectoryIfMissing True (mountpoint <> "/" <> "sys")
-  rBind (root <> "dev") (mountpoint <> "/" <> "dev")
-  rBind (root <> "sys") (mountpoint <> "/" <> "sys")
-
-cleanUpDir :: FilePath -> IO ()
-cleanUpDir mountpoint = do
-  umountWith Detach Follow (mountpoint <> "sys")
-  umountWith Detach Follow (mountpoint <> "dev")
 
 checkForUser :: NixRun e m => CUid -> m ()
 checkForUser a = do

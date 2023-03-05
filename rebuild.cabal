@@ -21,15 +21,18 @@ library
                     lens,
                     text,
                     exceptions,
-                    linux-mount,
                     directory,
                     optparse-applicative
+  if !os(darwin)
+     build-depends: linux-mount
+     exposed-modules: Rebuild.Linux,
+                      Rebuild.Install
 
   exposed-modules: Rebuild.Helpers,
                    Rebuild.Builders,
                    Rebuild.Cli,
                    Rebuild.Deploy,
-                   Rebuild.Install
+                   Rebuild.Darwin
 
   hs-source-dirs: src
   default-language: Haskell2010

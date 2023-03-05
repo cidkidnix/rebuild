@@ -8,8 +8,8 @@ import Cli.Extras
 import Control.Monad.IO.Class
 import Data.Monoid as M
 import qualified Data.Text as T
-import Rebuild.Builders
 import Rebuild.Helpers
+import Rebuild.Linux
 
 installToDir :: NixRun e m => String -> Bool -> String -> String -> m ()
 installToDir root pass path name = do
