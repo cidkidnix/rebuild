@@ -27,7 +27,10 @@ library
 
   exposed-modules: Rebuild.Helpers,
                    Rebuild.Builders,
-                   Rebuild.Cli
+                   Rebuild.Cli,
+                   Rebuild.Deploy,
+                   Rebuild.Install
+
   hs-source-dirs: src
   default-language: Haskell2010
 

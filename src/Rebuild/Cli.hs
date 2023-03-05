@@ -24,12 +24,15 @@ where
 import Cli.Extras
 import Options.Applicative
 import Rebuild.Builders
+import Rebuild.Deploy
 import Rebuild.Helpers
+import Rebuild.Install
 
 data Opts = Opts
   { configpath :: !String,
     nixsystem :: !String,
     verbose :: !Bool,
+    darwin :: !Bool,
     scommand :: !Command
   }
 
@@ -83,6 +86,7 @@ programOptions hostname =
           <> value hostname
       )
     <*> switch (long "verbose")
+    <*> switch (long "darwin")
     <*> hsubparser
       ( switchCommand
           <> buildCommand
