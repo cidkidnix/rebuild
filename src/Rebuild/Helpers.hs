@@ -18,6 +18,7 @@ module Rebuild.Helpers
     setupDir,
     cleanUpDir,
     withChroot,
+    withSSH,
     filterNixString,
     NixRun,
     nixEnvPath,
@@ -28,7 +29,6 @@ import Cli.Extras
 import Control.Lens
 import Control.Monad.Catch
 import Control.Monad.IO.Class
-import Data.List as L
 import Data.Monoid as M
 import qualified Data.Text as T
 import System.Directory
@@ -88,19 +88,19 @@ commonNixArgs =
 
 filterNixString :: String -> String
 filterNixString a = do
-  let a' = (filter (/= '"')) (a)
-  (filter (/= '\n')) (a')
+  let a' = filter (/= '"') a
+  filter (/= '\n') a'
 
 runProcess :: NixRun e m => FilePath -> [String] -> m String
 runProcess com args = do
-  let args' = map (filterNixString) (args)
+  let args' = map filterNixString args
       cmd = com
-  fmap T.unpack $ readProcessAndLogOutput (Debug, Debug) (proc cmd args')
+  T.unpack <$> readProcessAndLogOutput (Debug, Debug) (proc cmd args')
 
 runProcessWithSSH :: NixRun e m => String -> String -> [String] -> [String] -> m String
 runProcessWithSSH port host sargs com = do
-  let sargs' = map (filterNixString) (sargs)
-      pargs' = L.intercalate " " com
+  let sargs' = map filterNixString sargs
+      pargs' = unwords com
       cmd = sshExePath
       args' =
         M.mconcat
@@ -108,27 +108,30 @@ runProcessWithSSH port host sargs com = do
             [host, "-p", port],
             [pargs']
           ]
-  fmap T.unpack $ readProcessAndLogOutput (Debug, Debug) (proc cmd args')
+  T.unpack <$> readProcessAndLogOutput (Debug, Debug) (proc cmd args')
 
 withChroot :: NixRun e m => FilePath -> FilePath -> [[String]] -> m ()
 withChroot path sh com = mapM_ (\x -> runChroot path sh x) com
 
+withSSH :: NixRun e m => String -> String -> [String] -> [[String]] -> m ()
+withSSH port host sargs com = mapM_ (\x -> runProcessWithSSH port host sargs x) com
+
 signClosures :: NixRun e m => String -> String -> m String
 signClosures path key = do
-  let outpath' = (filterNixString path)
-  withSpinner ("Signing path " <> (T.pack path)) $ do
+  let outpath' = filterNixString path
+  withSpinner ("Signing path " <> T.pack path) $ do
     runProcess nixExePath ["store", "sign", "-k", key, outpath']
 
 copyDeployment :: NixRun e m => String -> String -> String -> String -> m String
 copyDeployment host name outpath uri = do
-  let outpath' = (filterNixString outpath)
+  let outpath' = filterNixString outpath
       nixhost = uri <> host
-  withSpinner ("Copying Deployment for " <> (T.pack name)) $ do
+  withSpinner ("Copying Deployment for " <> T.pack name) $ do
     runProcess nixExePath ["copy", "-s", "--to", nixhost, outpath', "--no-check-sigs"]
 
 runChroot :: NixRun e m => String -> FilePath -> [String] -> m String
 runChroot path sh com = do
-  let command = L.intercalate " " com
+  let command = unwords com
       args' =
         M.mconcat
           [ [path, sh, "-c", command]

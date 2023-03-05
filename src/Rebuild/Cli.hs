@@ -148,7 +148,7 @@ build :: NixRun e m => String -> String -> String -> m ()
 build path name arg = case arg of
   "build" -> do
     sysbuild <- buildSystemConfig path name "toplevel"
-    putLog (Informational) ("System Closure at " <> (T.pack sysbuild))
+    putLog Informational ("System Closure at " <> T.pack sysbuild)
     pure ()
   "switch" -> do
     checkForUser 0
@@ -174,7 +174,7 @@ build path name arg = case arg of
     pure ()
   "build-iso" -> do
     sysbuild <- buildSystemConfig path name "isoImage"
-    putLog (Informational) ("ISO image at " <> (T.pack sysbuild))
+    putLog Informational ("ISO image at " <> T.pack sysbuild)
     pure ()
   _ -> pure ()
 
