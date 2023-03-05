@@ -31,7 +31,6 @@ import Data.Monoid as M
 import qualified Data.Text as T
 import System.Directory
 import System.Exit
-import System.Linux.Mount
 import System.Posix.Types
 import System.Posix.User
 import System.Which
