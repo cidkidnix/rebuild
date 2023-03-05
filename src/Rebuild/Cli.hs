@@ -15,7 +15,6 @@ module Rebuild.Cli
     deployOpts,
     nixInstall,
     nixInstallOpts,
-    build,
     impl,
     Opts,
     Command,
@@ -23,7 +22,6 @@ module Rebuild.Cli
 where
 
 import Cli.Extras
-import qualified Data.Text as T
 import Options.Applicative
 import Rebuild.Builders
 import Rebuild.Helpers
@@ -37,11 +35,11 @@ data Opts = Opts
 
 data Command
   = Build
-  | Switch
   | VM
   | VMWithBootLoader
   | DryActivate
-  | Boot
+  | Switch String
+  | Boot String
   | BuildISO
   | Deploy String String String Bool
   | NixOSInstall String Bool
@@ -55,7 +53,7 @@ genCommandCli a b c =
 optsParser :: String -> ParserInfo Opts
 optsParser hostname =
   info
-    (helper <*> versionOption <*> (programOptions hostname))
+    (helper <*> versionOption <*> programOptions hostname)
     ( fullDesc
         <> progDesc "rebuild system"
         <> header
@@ -98,7 +96,16 @@ programOptions hostname =
       )
 
 switchCommand :: Mod CommandFields Command
-switchCommand = genCommandCli "switch" "Switch to configuration" Switch
+switchCommand =
+  command
+    "switch"
+    (info systemOptsS (progDesc "Switch to new configuration"))
+
+bootCommand :: Mod CommandFields Command
+bootCommand = do
+  command
+    "boot"
+    (info systemOptsB (progDesc "Boot to new configuration"))
 
 buildCommand :: Mod CommandFields Command
 buildCommand = genCommandCli "build" "Build Configuration" Build
@@ -111,9 +118,6 @@ vmWBLCommand = genCommandCli "vm-with-bootloader" "Build VM with Bootloader" VMW
 
 dryCommand :: Mod CommandFields Command
 dryCommand = genCommandCli "dry-activate" "Show what would have been done if activated" DryActivate
-
-bootCommand :: Mod CommandFields Command
-bootCommand = genCommandCli "boot" "Build Configuration but down switch" Boot
 
 buildISOCommand :: Mod CommandFields Command
 buildISOCommand = genCommandCli "build-iso" "Build ISO image" BuildISO
@@ -144,39 +148,13 @@ nixInstallOpts =
     <$> strArgument (metavar "ROOT" <> help "Where to install NixOS to")
     <*> switch (long "no-root-password" <> help "Install with no root password")
 
-build :: NixRun e m => String -> String -> String -> m ()
-build path name arg = case arg of
-  "build" -> do
-    sysbuild <- buildSystemConfig path name "toplevel"
-    putLog Informational ("System Closure at " <> T.pack sysbuild)
-    pure ()
-  "switch" -> do
-    checkForUser 0
-    sysbuild <- addSystem path name "toplevel"
-    _ <- switchToConfig sysbuild arg
-    pure ()
-  "boot" -> do
-    checkForUser 0
-    sysbuild <- addSystem path name "toplevel"
-    _ <- switchToConfig sysbuild arg
-    pure ()
-  "dry-activate" -> do
-    sysbuild <- buildSystemConfig path name "toplevel"
-    _ <- switchToConfig sysbuild arg
-    pure ()
-  "vm" -> do
-    sysbuild <- buildSystemConfig path name "vm"
-    _ <- runVM sysbuild name
-    pure ()
-  "vm-with-bootloader" -> do
-    sysbuild <- buildSystemConfig path name "vmWithBootLoader"
-    _ <- runVM sysbuild name
-    pure ()
-  "build-iso" -> do
-    sysbuild <- buildSystemConfig path name "isoImage"
-    putLog Informational ("ISO image at " <> T.pack sysbuild)
-    pure ()
-  _ -> pure ()
+systemOptsS :: Parser Command
+systemOptsS =
+  Switch <$> strOption (long "profile" <> value "/nix/var/nix/profiles/system" <> help "Profile to install to" <> showDefault)
+
+systemOptsB :: Parser Command
+systemOptsB =
+  Boot <$> strOption (long "profile" <> value "/nix/var/nix/profiles/system" <> help "Profile to install to" <> showDefault)
 
 impl :: String -> IO ()
 impl hostname = do
@@ -185,12 +163,12 @@ impl hostname = do
         True -> Debug
         False -> Informational
   nixRun severity $ case scommand opts of
-    Build -> build (configpath opts) (nixsystem opts) "build"
-    VM -> build (configpath opts) (nixsystem opts) "vm"
-    Switch -> build (configpath opts) (nixsystem opts) "switch"
-    VMWithBootLoader -> build (configpath opts) (nixsystem opts) "vm-with-bootloader"
-    DryActivate -> build (configpath opts) (nixsystem opts) "dry-activate"
-    Boot -> build (configpath opts) (nixsystem opts) "boot"
-    BuildISO -> build (configpath opts) (nixsystem opts) "build-iso"
+    Build -> regBuild (configpath opts) (nixsystem opts) "build"
+    VM -> regBuild (configpath opts) (nixsystem opts) "vm"
+    Switch profile -> systemBuild (configpath opts) (nixsystem opts) profile "switch"
+    Boot profile -> systemBuild (configpath opts) (nixsystem opts) profile "boot"
+    VMWithBootLoader -> regBuild (configpath opts) (nixsystem opts) "vm-with-bootloader"
+    DryActivate -> regBuild (configpath opts) (nixsystem opts) "dry-activate"
+    BuildISO -> regBuild (configpath opts) (nixsystem opts) "build-iso"
     NixOSInstall root pass -> installToDir root pass (configpath opts) (nixsystem opts)
     Deploy sys port key doSign -> deployConfig doSign (configpath opts) (nixsystem opts) sys port key
