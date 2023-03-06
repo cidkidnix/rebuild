@@ -27,6 +27,11 @@ import Options.Applicative
 import Rebuild.Builders
 import Rebuild.Deploy
 import Rebuild.Helpers
+
+-- Ugly hacks to get darwin to be the default
+-- and not depend on linux-mount on all platforms
+-- we still want the darwin code on non-darwin system
+-- since it's not darwin-specific (somewhat)
 #if !defined(darwin_HOST_OS)
 import Rebuild.Install
 import Rebuild.Darwin hiding (installToDir)
