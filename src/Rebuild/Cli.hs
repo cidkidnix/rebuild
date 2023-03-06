@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -26,7 +27,15 @@ import Options.Applicative
 import Rebuild.Builders
 import Rebuild.Deploy
 import Rebuild.Helpers
+#if !defined(darwin_HOST_OS)
 import Rebuild.Install
+import Rebuild.Darwin hiding (installToDir)
+#elif defined(darwin_HOST_OS)
+import Rebuild.Darwin
+
+switchTrue :: Mod FlagFields Bool -> Parser Bool
+switchTrue = flag True False
+#endif
 
 data Opts = Opts
   { configpath :: !String,
@@ -86,7 +95,11 @@ programOptions hostname =
           <> value hostname
       )
     <*> switch (long "verbose")
+#if defined(darwin_HOST_OS)
+    <*> switchTrue (long "darwin")
+#elif !defined(darwin_HOST_OS)
     <*> switch (long "darwin")
+#endif
     <*> hsubparser
       ( switchCommand
           <> buildCommand
@@ -166,13 +179,24 @@ impl hostname = do
   let severity = case verbose opts of
         True -> Debug
         False -> Informational
-  nixRun severity $ case scommand opts of
-    Build -> regBuild (configpath opts) (nixsystem opts) "build"
-    VM -> regBuild (configpath opts) (nixsystem opts) "vm"
-    Switch profile -> systemBuild (configpath opts) (nixsystem opts) profile "switch"
-    Boot profile -> systemBuild (configpath opts) (nixsystem opts) profile "boot"
-    VMWithBootLoader -> regBuild (configpath opts) (nixsystem opts) "vm-with-bootloader"
-    DryActivate -> regBuild (configpath opts) (nixsystem opts) "dry-activate"
-    BuildISO -> regBuild (configpath opts) (nixsystem opts) "build-iso"
-    NixOSInstall root pass -> installToDir root pass (configpath opts) (nixsystem opts)
-    Deploy sys port key doSign -> deployConfig doSign (configpath opts) (nixsystem opts) sys port key
+  case darwin opts of
+    True -> nixRun severity $ case scommand opts of
+      Switch profile -> darwinBuild (configpath opts) (nixsystem opts) profile "switch"
+      Boot _ -> failWith "Darwin doesn't support boot!"
+      VM -> failWith "Darwin doesn't support VM!"
+      VMWithBootLoader -> failWith "Darwin doesn't support VM with Bootloader!"
+      DryActivate -> failWith "Darwin doesn't support Dry-activate!"
+      NixOSInstall _ _ -> failWith "Darwin doesn't support NixOS installer!"
+      Deploy _ _ _ _ -> failWith "Not currently implemented"
+      Build -> regDarwinBuild (configpath opts) (nixsystem opts) "build"
+      _ -> pure ()
+    False -> nixRun severity $ case scommand opts of
+      Build -> regBuild (configpath opts) (nixsystem opts) "build"
+      VM -> regBuild (configpath opts) (nixsystem opts) "vm"
+      Switch profile -> systemBuild (configpath opts) (nixsystem opts) profile "switch"
+      Boot profile -> systemBuild (configpath opts) (nixsystem opts) profile "boot"
+      VMWithBootLoader -> regBuild (configpath opts) (nixsystem opts) "vm-with-bootloader"
+      DryActivate -> regBuild (configpath opts) (nixsystem opts) "dry-activate"
+      BuildISO -> regBuild (configpath opts) (nixsystem opts) "build-iso"
+      NixOSInstall root pass -> installToDir root pass (configpath opts) (nixsystem opts)
+      Deploy sys port key doSign -> deployConfig doSign (configpath opts) (nixsystem opts) sys port key
