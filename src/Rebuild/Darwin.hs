@@ -37,8 +37,7 @@ switchToConfig path = do
   let path' = filterNixString path
 
   withSpinner ("Switching to " <> T.pack path') $ do
-    _ <- runProcess (path' <> "/activate") []
-    runProcess (path' <> "/activae-user") []
+    runProcess (path' <> "/activate") []
 
 darwinBuild :: NixRun e m => String -> String -> String -> String -> m ()
 darwinBuild path name profile arg = case arg of

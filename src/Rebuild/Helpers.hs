@@ -87,7 +87,7 @@ nixOSBuildargs :: String -> String -> String -> String -> [String]
 nixOSBuildargs flakepath name typ profile = ["--no-link", "--print-out-paths", "--profile", profile, flakepath <> "#nixosConfigurations." <> name <> ".config.system.build." <> typ]
 
 nixDarwinBuildargs :: String -> String -> String -> String -> [String]
-nixDarwinBuildargs flakepath name typ profile = ["--no-link", "--print-out-paths", "--profile", profile, flakepath <> "#darwinConfigurations" <> name <> ".config.system.build." <> typ]
+nixDarwinBuildargs flakepath name typ profile = ["--no-link", "--print-out-paths", "--profile", profile, flakepath <> "#darwinConfigurations." <> name <> ".config.system.build." <> typ]
 
 filterNixString :: String -> String
 filterNixString a = do

@@ -27,13 +27,16 @@ import Options.Applicative
 import Rebuild.Builders
 import Rebuild.Deploy
 import Rebuild.Helpers
-#if !defined(darwin_HOST_OS) || !defined(macos_HOST_OS)
+#if !defined(darwin_HOST_OS)
 import Rebuild.Install
 import Rebuild.Darwin hiding (installToDir)
-#endif
-#if defined(darwin_HOST_OS) || defined(macos_HOST_OS)
+#elif defined(darwin_HOST_OS)
 import Rebuild.Darwin
+
+switchTrue :: Mod FlagFields Bool -> Parser Bool
+switchTrue = flag True False
 #endif
+
 data Opts = Opts
   { configpath :: !String,
     nixsystem :: !String,
@@ -92,7 +95,11 @@ programOptions hostname =
           <> value hostname
       )
     <*> switch (long "verbose")
+#if defined(darwin_HOST_OS)
+    <*> switchTrue (long "darwin")
+#elif !defined(darwin_HOST_OS)
     <*> switch (long "darwin")
+#endif
     <*> hsubparser
       ( switchCommand
           <> buildCommand
