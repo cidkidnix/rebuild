@@ -14,44 +14,45 @@ module Rebuild.Builders
 where
 
 import Cli.Extras
+import Control.Monad.IO.Class
 import Data.Monoid as M
+import Data.Text (Text)
 import qualified Data.Text as T
 import Rebuild.Helpers
 
-addSystem :: NixRun e m => String -> String -> String -> String -> m String
-addSystem flakepath name profile typ = do
+addSystem :: NixRun e m => FlakeDef -> String -> String -> m StorePath
+addSystem flakedef name profile = do
   let args =
         M.mconcat
           [ commonNixArgs,
             ["build"],
-            nixOSBuildargs flakepath name typ profile
+            ["--no-link", "--print-out-paths", "--profile", profile],
+            fromFlakeDef flakedef
           ]
   withSpinner ("Building System " <> T.pack name <> " and adding to profile " <> T.pack profile) $ do
-    runProcess nixExePath args
+    runProcess nixExePath (map T.pack args)
 
-buildSystemConfig :: NixRun e m => String -> String -> String -> m String
+buildSystemConfig :: NixRun e m => String -> String -> String -> m StorePath
 buildSystemConfig flakepath name typ = do
   let args =
         M.mconcat
           [ commonNixArgs,
-            ["build", flakepath <> "#nixosConfigurations." <> name <> ".config.system.build." <> typ],
+            ["build"],
+            fromFlakeDef (nixOSBuildargs flakepath name typ),
             ["--no-link", "--print-out-paths"]
           ]
   withSpinner ("Building System " <> T.pack name) $ do
-    runProcess nixExePath args
+    runProcess nixExePath (map T.pack args)
 
-switchToConfig :: NixRun e m => String -> String -> m String
+switchToConfig :: NixRun e m => StorePath -> Text -> m StorePath
 switchToConfig path arg = do
-  let path' = filterNixString path
+  withSpinner ("Switching to " <> fromStorePath path) $ do
+    runProcess (toFilePath path <> "/bin/switch-to-configuration") [arg]
 
-  withSpinner ("Switching to " <> T.pack path') $ do
-    runProcess (path' <> "/bin/switch-to-configuration") [arg]
-
-runVM :: NixRun e m => String -> String -> m String
+runVM :: NixRun e m => StorePath -> String -> m StorePath
 runVM path sys = do
-  let path' = filterNixString path
   withSpinner "Running VM.. " $ do
-    runProcess (path' <> "/bin/run-" <> sys <> "-vm") []
+    runProcess (toFilePath path <> "/bin/run-" <> sys <> "-vm") []
 
 -- systemBuild and regBuild are split, because when we switch or boot to a new configuration
 -- we have to add it to the system profile, we don't want to do this if we just build
@@ -59,25 +60,25 @@ runVM path sys = do
 -- and subsequently the bootloader
 --
 -- Also we need to pass the profile to systemBuild
-systemBuild :: NixRun e m => String -> String -> String -> String -> m ()
+systemBuild :: NixRun e m => String -> String -> String -> Text -> m ()
 systemBuild path name profile arg = case arg of
   "switch" -> do
     checkForUser 0
-    sysbuild <- addSystem path name profile "toplevel"
+    sysbuild <- addSystem (nixOSBuildargs path name "toplevel") name profile
     _ <- switchToConfig sysbuild arg
     pure ()
   "boot" -> do
     checkForUser 0
-    sysbuild <- addSystem path name profile "toplevel"
+    sysbuild <- addSystem (nixOSBuildargs path name "toplevel") name profile
     _ <- switchToConfig sysbuild arg
     pure ()
   _ -> pure ()
 
-regBuild :: NixRun e m => String -> String -> String -> m ()
+regBuild :: NixRun e m => String -> String -> Text -> m ()
 regBuild path name arg = case arg of
   "build" -> do
     sysbuild <- buildSystemConfig path name "toplevel"
-    putLog Informational ("System Closure at " <> T.pack sysbuild)
+    putLog Informational ("System Closure at " <> fromStorePath sysbuild)
     pure ()
   "dry-activate" -> do
     sysbuild <- buildSystemConfig path name "toplevel"
@@ -93,6 +94,6 @@ regBuild path name arg = case arg of
     pure ()
   "build-iso" -> do
     sysbuild <- buildSystemConfig path name "isoImage"
-    putLog Informational ("ISO image at " <> T.pack sysbuild)
+    putLog Informational ("ISO image at " <> fromStorePath sysbuild)
     pure ()
   _ -> pure ()

@@ -16,7 +16,7 @@ installToDir root pass path name = do
   checkForUser 0
 
   -- Build and install to system profile in mounted system
-  sysbuild <- installBuild path name root "/nix/var/nix/profiles/system"
+  sysbuild <- installBuild (nixOSBuildargs name path "toplevel") root "/nix/var/nix/profiles/system"
 
   -- Prepare Chroot
   putLog Informational ("Setting up / -> " <> T.pack root)
@@ -27,28 +27,26 @@ installToDir root pass path name = do
     _ -> pure ()
 
   putLog Informational ("Running chroot for " <> T.pack root)
-  let sysbuild' = filterNixString sysbuild
-
   -- Run switch with NIXOS_INSTALL_BOOTLOADER so we properly install the bootloader
   _ <-
     withChroot
       root
-      (sysbuild' <> "/sw/bin/bash")
-      [ ["NIXOS_INSTALL_BOOTLOADER=1 " <> sysbuild' <> "/bin/switch-to-configuration", "boot"]
+      (toFilePath sysbuild <> "/sw/bin/bash")
+      [ ["NIXOS_INSTALL_BOOTLOADER=1 " <> T.unpack (fromStorePath sysbuild) <> "/bin/switch-to-configuration", "boot"]
       ]
 
   -- Attempt cleanup of mountpoint
   liftIO $ cleanUpDir root
   pure ()
 
-installBuild :: NixRun e m => String -> String -> String -> String -> m String
-installBuild flakepath name mountpoint profile = do
+installBuild :: NixRun e m => FlakeDef -> String -> String -> m StorePath
+installBuild flakedef mountpoint profile = do
   let args =
         M.mconcat
           [ commonNixArgs,
             ["build", "--no-link", "--print-out-paths"],
             ["--profile", mountpoint <> profile],
-            nixOSBuildargs flakepath name "toplevel" profile
+            fromFlakeDef flakedef
           ]
   withSpinner "Installing profile ..." $ do
-    runProcess nixExePath args
+    runProcess nixExePath (map T.pack args)

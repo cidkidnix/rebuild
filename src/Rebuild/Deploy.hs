@@ -10,22 +10,21 @@ import Rebuild.Builders
 import Rebuild.Helpers
 
 -- Register remotely
-installProfileRemote :: NixRun e m => String -> String -> m String
+installProfileRemote :: NixRun e m => String -> StorePath -> m OtherOutput
 installProfileRemote host outpath = do
   withSpinner ("Installing system to" <> T.pack host) $ do
-    runProcessWithSSH "22" host ["-t"] ["nix profile install ", outpath, " --profile /nix/var/nix/profiles/test"]
+    runProcessWithSSH "22" host ["-t"] ["nix profile install ", fromStorePath outpath, " --profile /nix/var/nix/profiles/test"]
 
 deployConfig :: NixRun e m => Bool -> String -> String -> String -> String -> String -> m ()
 deployConfig doSign path name host port key = do
   build <- buildSystemConfig path name "toplevel"
-  _ <- copyDeployment host name (filterNixString build) "ssh-ng://"
-  _ <- installProfileRemote host (filterNixString build)
+  _ <- copyDeployment (T.pack host) name build "ssh-ng://"
+  _ <- installProfileRemote host build
 
   _ <- case doSign of
-    True -> signClosures build key
+    True -> signClosures build (T.pack key)
     False -> return "Nothing"
 
-  _ <- withSpinner ("Switching " <> T.pack host <> " to " <> T.pack (filterNixString build)) $ do
-    runProcessWithSSH port host ["-t"] [filterNixString build <> "/bin/switch-to-configuration", "switch"]
-
+  _ <- withSpinner ("Switching " <> T.pack host <> " to " <> fromStorePath build) $ do
+    runProcessWithSSH port host ["-t"] [fromStorePath build <> "/bin/switch-to-configuration", "switch"]
   pure ()

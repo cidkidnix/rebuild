@@ -1,5 +1,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -15,11 +16,20 @@ module Rebuild.Helpers
     copyDeployment,
     signClosures,
     withSSH,
-    filterNixString,
     NixRun,
     nixEnvPath,
     nixOSBuildargs,
     nixDarwinBuildargs,
+    NixStore,
+    NixSettings,
+    StorePath,
+    FlakeDef,
+    OtherOutput,
+    fromFlakeDef,
+    toFlakeDef,
+    fromStorePath,
+    toStorePath,
+    toFilePath,
   )
 where
 
@@ -28,16 +38,59 @@ import Control.Lens
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Data.Monoid as M
+import Data.String
+import Data.Text (Text)
 import qualified Data.Text as T
-import System.Directory
 import System.Exit
 import System.Posix.Types
 import System.Posix.User
 import System.Which
 
+class IsStorePath a where
+  fromStorePath :: a -> Text
+  toStorePath :: Text -> a
+  toFilePath :: a -> FilePath
+
+class IsNixStore a where
+  fromNixStore :: a -> Text
+
+class IsFlakeDef a where
+  fromFlakeDef :: a -> [String]
+  toFlakeDef :: String -> String -> String -> String -> a
+
+newtype NixStore = NixStore String
+
+instance IsNixStore NixStore where
+  fromNixStore (NixStore s) = T.pack s
+
+newtype StorePath = StorePath Text
+
+instance IsString StorePath where
+  fromString x = StorePath (T.pack x)
+
+instance IsStorePath StorePath where
+  fromStorePath (StorePath s) = T.filter (/= '\n') (T.filter (/= '"') s)
+
+  -- T.filter (/= '\n') s
+  toStorePath = StorePath
+  toFilePath x = T.unpack (fromStorePath x)
+
+newtype FlakeDef = FlakeDef [String]
+
+instance IsFlakeDef FlakeDef where
+  fromFlakeDef (FlakeDef s) = s
+  toFlakeDef flakepath config name typ = FlakeDef [flakepath <> "#" <> config <> "." <> name <> "." <> "config.system.build" <> "." <> typ]
+
+type OtherOutput = StorePath
+
+data NixSettings = NixSettings
+  { _options :: [String],
+    _storepath :: NixStore
+  }
+
 data NixError
   = P ProcessFailure
-  | T T.Text
+  | T Text
 
 instance Show NixError where
   show = \case
@@ -83,51 +136,41 @@ commonNixArgs =
     [ ["--option", "sandbox", "true"]
     ]
 
-nixOSBuildargs :: String -> String -> String -> String -> [String]
-nixOSBuildargs flakepath name typ profile = ["--no-link", "--print-out-paths", "--profile", profile, flakepath <> "#nixosConfigurations." <> name <> ".config.system.build." <> typ]
+nixOSBuildargs :: String -> String -> String -> FlakeDef
+nixOSBuildargs flakepath = toFlakeDef flakepath "nixosConfigurations"
 
-nixDarwinBuildargs :: String -> String -> String -> String -> [String]
-nixDarwinBuildargs flakepath name typ profile = ["--no-link", "--print-out-paths", "--profile", profile, flakepath <> "#darwinConfigurations." <> name <> ".config.system.build." <> typ]
+nixDarwinBuildargs :: String -> String -> String -> FlakeDef
+nixDarwinBuildargs flakepath = toFlakeDef flakepath "darwinConfigurations"
 
-filterNixString :: String -> String
-filterNixString a = do
-  let a' = filter (/= '"') a
-  filter (/= '\n') a'
-
-runProcess :: NixRun e m => FilePath -> [String] -> m String
+runProcess :: NixRun e m => FilePath -> [Text] -> m StorePath
 runProcess com args = do
-  let args' = map filterNixString args
-      cmd = com
-  T.unpack <$> readProcessAndLogOutput (Debug, Debug) (proc cmd args')
+  toStorePath <$> readProcessAndLogOutput (Debug, Debug) (proc com (map T.unpack args))
 
-runProcessWithSSH :: NixRun e m => String -> String -> [String] -> [String] -> m String
+runProcessWithSSH :: NixRun e m => String -> String -> [String] -> [Text] -> m OtherOutput
 runProcessWithSSH port host sargs com = do
-  let sargs' = map filterNixString sargs
-      pargs' = unwords com
+  let pargs' = T.unwords com
       cmd = sshExePath
       args' =
         M.mconcat
-          [ sargs',
+          [ sargs,
             [host, "-p", port],
-            [pargs']
+            [T.unpack pargs']
           ]
-  T.unpack <$> readProcessAndLogOutput (Debug, Debug) (proc cmd args')
+  toStorePath <$> readProcessAndLogOutput (Debug, Debug) (proc cmd args')
 
-withSSH :: NixRun e m => String -> String -> [String] -> [[String]] -> m ()
+withSSH :: NixRun e m => String -> String -> [String] -> [[Text]] -> m ()
 withSSH port host sargs com = mapM_ (\x -> runProcessWithSSH port host sargs x) com
 
-signClosures :: NixRun e m => String -> String -> m String
+signClosures :: NixRun e m => StorePath -> Text -> m StorePath
 signClosures path key = do
-  let outpath' = filterNixString path
-  withSpinner ("Signing path " <> T.pack path) $ do
-    runProcess nixExePath ["store", "sign", "-k", key, outpath']
+  withSpinner ("Signing path " <> fromStorePath path) $ do
+    runProcess nixExePath ["store", "sign", "-k", key, fromStorePath path]
 
-copyDeployment :: NixRun e m => String -> String -> String -> String -> m String
+copyDeployment :: NixRun e m => Text -> String -> StorePath -> Text -> m OtherOutput
 copyDeployment host name outpath uri = do
-  let outpath' = filterNixString outpath
-      nixhost = uri <> host
+  let nixhost = uri <> host
   withSpinner ("Copying Deployment for " <> T.pack name) $ do
-    runProcess nixExePath ["copy", "-s", "--to", nixhost, outpath', "--no-check-sigs"]
+    runProcess nixExePath ["copy", "-s", "--to", nixhost, fromStorePath outpath, "--no-check-sigs"]
 
 checkForUser :: NixRun e m => CUid -> m ()
 checkForUser a = do

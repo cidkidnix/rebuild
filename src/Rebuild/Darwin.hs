@@ -7,43 +7,44 @@ module Rebuild.Darwin (addDarwinSystem, buildDarwinConfig, darwinBuild, regDarwi
 
 import Cli.Extras
 import Data.Monoid as M
+import Data.Text (Text)
 import qualified Data.Text as T
 import Rebuild.Helpers
 
-addDarwinSystem :: NixRun e m => String -> String -> String -> String -> m String
-addDarwinSystem flakepath name profile typ = do
+addDarwinSystem :: NixRun e m => FlakeDef -> String -> String -> m OtherOutput
+addDarwinSystem flakedef name profile = do
   let args =
         M.mconcat
           [ commonNixArgs,
             ["build"],
-            nixDarwinBuildargs flakepath name typ profile
+            ["--profile", profile],
+            fromFlakeDef flakedef
           ]
   withSpinner ("Building System " <> T.pack name <> " and adding to profile " <> T.pack profile) $ do
-    runProcess nixExePath args
+    runProcess nixExePath (map T.pack args)
 
-buildDarwinConfig :: NixRun e m => String -> String -> String -> m String
-buildDarwinConfig flakepath name typ = do
+buildDarwinConfig :: NixRun e m => FlakeDef -> Text -> m StorePath
+buildDarwinConfig flakedef name = do
   let args =
         M.mconcat
           [ commonNixArgs,
-            ["build", flakepath <> "#darwinConfigurations." <> name <> ".config.system.build." <> typ],
+            ["build"],
+            fromFlakeDef flakedef,
             ["--no-link", "--print-out-paths"]
           ]
-  withSpinner ("Building System " <> T.pack name) $ do
-    runProcess nixExePath args
+  withSpinner ("Building System " <> name) $ do
+    runProcess nixExePath (map T.pack args)
 
-switchToConfig :: NixRun e m => String -> m String
+switchToConfig :: NixRun e m => StorePath -> m OtherOutput
 switchToConfig path = do
-  let path' = filterNixString path
-
-  withSpinner ("Switching to " <> T.pack path') $ do
-    runProcess (path' <> "/activate") []
+  withSpinner ("Switching to " <> fromStorePath path) $ do
+    runProcess (toFilePath path <> "/activate") []
 
 darwinBuild :: NixRun e m => String -> String -> String -> String -> m ()
 darwinBuild path name profile arg = case arg of
   "switch" -> do
     checkForUser 0
-    sysbuild <- addDarwinSystem path name profile "toplevel"
+    sysbuild <- addDarwinSystem (nixDarwinBuildargs path name "toplevel") name profile
     _ <- switchToConfig sysbuild
     pure ()
   _ -> pure ()
@@ -51,8 +52,8 @@ darwinBuild path name profile arg = case arg of
 regDarwinBuild :: NixRun e m => String -> String -> String -> m ()
 regDarwinBuild path name arg = case arg of
   "build" -> do
-    sysbuild <- buildDarwinConfig path name "toplevel"
-    putLog Informational ("System Closure at " <> T.pack sysbuild)
+    sysbuild <- buildDarwinConfig (nixDarwinBuildargs path name "toplevel") (T.pack name)
+    putLog Informational ("System Closure at " <> fromStorePath sysbuild)
     pure ()
   _ -> pure ()
 

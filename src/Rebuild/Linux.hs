@@ -12,6 +12,8 @@ module Rebuild.Linux
 where
 
 import Data.Monoid as M
+import Data.Text (Text)
+import qualified Data.Text as T
 import Rebuild.Helpers
 import System.Directory
 import System.Linux.Mount
@@ -19,14 +21,14 @@ import System.Linux.Mount
 withChroot :: NixRun e m => FilePath -> FilePath -> [[String]] -> m ()
 withChroot path sh com = mapM_ (\x -> runChroot path sh x) com
 
-runChroot :: NixRun e m => String -> FilePath -> [String] -> m String
+runChroot :: NixRun e m => String -> FilePath -> [String] -> m OtherOutput
 runChroot path sh com = do
   let command = unwords com
       args' =
         M.mconcat
           [ [path, sh, "-c", command]
           ]
-  runProcess "chroot" args'
+  runProcess "chroot" (map T.pack args')
 
 setupDir :: FilePath -> FilePath -> IO ()
 setupDir root mountpoint = do
