@@ -6,7 +6,7 @@
 module Rebuild.Darwin (addDarwinSystem, buildDarwinConfig, darwinBuild, regDarwinBuild, installToDir) where
 
 import Cli.Extras
-import Data.Monoid as M
+import Data.Monoid as M (Monoid (mconcat))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Rebuild.Helpers
@@ -58,5 +58,4 @@ regDarwinBuild path name arg = case arg of
   _ -> pure ()
 
 installToDir :: NixRun e m => String -> Bool -> String -> String -> m ()
-installToDir _ _ _ _ = do
-  pure ()
+installToDir _ _ _ _ = failWith "Not available on darwin!"

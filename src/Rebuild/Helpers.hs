@@ -16,20 +16,20 @@ module Rebuild.Helpers
     copyDeployment,
     signClosures,
     withSSH,
-    NixRun,
     nixEnvPath,
     nixOSBuildargs,
     nixDarwinBuildargs,
-    NixStore,
-    NixSettings,
-    StorePath,
-    FlakeDef,
-    OtherOutput,
     fromFlakeDef,
     toFlakeDef,
     fromStorePath,
     toStorePath,
     toFilePath,
+    NixRun,
+    NixStore,
+    NixSettings,
+    StorePath,
+    FlakeDef,
+    OtherOutput,
   )
 where
 
@@ -70,8 +70,6 @@ instance IsString StorePath where
 
 instance IsStorePath StorePath where
   fromStorePath (StorePath s) = T.filter (/= '\n') (T.filter (/= '"') s)
-
-  -- T.filter (/= '\n') s
   toStorePath = StorePath
   toFilePath x = T.unpack (fromStorePath x)
 

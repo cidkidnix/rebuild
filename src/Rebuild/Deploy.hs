@@ -10,6 +10,7 @@ import Rebuild.Builders
 import Rebuild.Helpers
 
 -- Register remotely
+-- Hopefully can remove if nix ever supports remote profile installs
 installProfileRemote :: NixRun e m => String -> StorePath -> m OtherOutput
 installProfileRemote host outpath = do
   withSpinner ("Installing system to" <> T.pack host) $ do

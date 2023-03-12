@@ -102,7 +102,7 @@ programOptions hostname =
     <*> switch (long "verbose")
 #if defined(darwin_HOST_OS)
     <*> switchTrue (long "darwin")
-#elif !defined(darwin_HOST_OS)
+#else
     <*> switch (long "darwin")
 #endif
     <*> hsubparser
