@@ -21,7 +21,7 @@ import System.Linux.Mount
 withChroot :: NixRun e m => FilePath -> FilePath -> [[String]] -> m ()
 withChroot path sh com = mapM_ (\x -> runChroot path sh x) com
 
-runChroot :: NixRun e m => String -> FilePath -> [String] -> m OtherOutput
+runChroot :: NixRun e m => String -> FilePath -> [String] -> m Text
 runChroot path sh com = do
   let command = unwords com
       args' =

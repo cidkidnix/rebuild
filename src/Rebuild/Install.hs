@@ -10,13 +10,14 @@ import Data.Monoid as M
 import qualified Data.Text as T
 import Rebuild.Helpers
 import Rebuild.Linux
+import Rebuild.Nix
 
 installToDir :: NixRun e m => String -> Bool -> String -> String -> m ()
 installToDir root pass path name = do
   checkForUser 0
 
   -- Build and install to system profile in mounted system
-  sysbuild <- installBuild (nixOSBuildargs name path "toplevel") root "/nix/var/nix/profiles/system"
+  sysbuild <- installBuild (nixOSBuildargs name path "toplevel") (T.pack root) "/nix/var/nix/profiles/system"
 
   -- Prepare Chroot
   putLog Informational ("Setting up / -> " <> T.pack root)
@@ -39,14 +40,6 @@ installToDir root pass path name = do
   liftIO $ cleanUpDir root
   pure ()
 
-installBuild :: NixRun e m => FlakeDef -> String -> String -> m StorePath
-installBuild flakedef mountpoint profile = do
-  let args =
-        M.mconcat
-          [ commonNixArgs,
-            ["build", "--no-link", "--print-out-paths"],
-            ["--profile", mountpoint <> profile],
-            fromFlakeDef flakedef
-          ]
-  withSpinner "Installing profile ..." $ do
-    runProcess nixExePath (map T.pack args)
+installBuild :: NixRun e m => FlakeDef -> T.Text -> T.Text -> m StorePath
+installBuild flakedef mountpoint profile = withSpinner "Installing profile ..." $ do
+  buildSystem defaultSettings flakedef (Just (mountpoint <> profile))

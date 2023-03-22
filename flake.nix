@@ -13,20 +13,22 @@
     pkgs' = supportedSystems (system: import "${inputs.nixpkgs}" {
       inherit system;
       overlays = [
-        (self: super: with super.haskell.lib; {
-          haskellPackages = super.haskellPackages // {
-            rebuild = overrideCabal (super.haskellPackages.callCabal2nix "rebuild" ./. { }) (drv: {
+        (final: prev: with prev.haskell.lib; {
+          haskellPackages = prev.haskellPackages.override {
+            overrides = self: super: {
+            rebuild = overrideCabal (super.callCabal2nix "rebuild" ./. { }) (drv: {
               postInstall = ''
                 mkdir -p $out/share/{bash,zsh}-completion/completions
                 $out/bin/rebuild --zsh-completion-script $out/bin/rebuild > $out/share/zsh-completion/completions/rebuild
                 $out/bin/rebuild --bash-completion-script $out/bin/rebuild > $out/share/bash-completion/completions/rebuild
               '';
               librarySystemDepends = with super; [
-                nix
-                openssh
+                prev.nix
+                prev.openssh
               ];
             });
           };
+        };
         })
       ];
     });
@@ -38,8 +40,8 @@
     });
     devShell = supportedSystems (system: pkgs'.${system}.haskellPackages.shellFor {
       packages = ps: with ps; [ rebuild ];
-      buildInputs = p: with p; [
-        Cabal
+      nativeBuildInputs = with pkgs'.${system}; [
+        cabal-install
       ];
       withHoogle = false;
     });
