@@ -28,7 +28,8 @@ library
                    Rebuild.Builders,
                    Rebuild.Cli,
                    Rebuild.Deploy,
-                   Rebuild.Darwin
+                   Rebuild.Darwin,
+                   Rebuild.Nix
 
   if !os(darwin) || !os(osx)
      build-depends: linux-mount
