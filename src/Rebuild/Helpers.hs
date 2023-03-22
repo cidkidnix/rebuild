@@ -13,8 +13,6 @@ module Rebuild.Helpers
     runProcess,
     nixRun,
     runProcessWithSSH,
-    copyDeployment,
-    signClosures,
     withSSH,
     nixEnvPath,
     nixOSBuildargs,
@@ -24,9 +22,9 @@ module Rebuild.Helpers
     fromStorePath,
     toStorePath,
     toFilePath,
+    intToText,
     NixRun,
     NixStore,
-    NixSettings,
     StorePath,
     FlakeDef,
     OtherOutput,
@@ -41,6 +39,10 @@ import Data.Monoid as M
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as T (toStrict)
+import qualified Data.Text.Lazy.Builder as B
+import qualified Data.Text.Lazy.Builder.Int as B
+import qualified Data.Text.Lazy.Builder.RealFloat as B
 import System.Exit
 import System.Posix.Types
 import System.Posix.User
@@ -58,10 +60,10 @@ class IsFlakeDef a where
   fromFlakeDef :: a -> [String]
   toFlakeDef :: String -> String -> String -> String -> a
 
-newtype NixStore = NixStore String
+newtype NixStore = NixStore Text
 
 instance IsNixStore NixStore where
-  fromNixStore (NixStore s) = T.pack s
+  fromNixStore (NixStore s) = s
 
 newtype StorePath = StorePath Text
 
@@ -73,6 +75,10 @@ instance IsStorePath StorePath where
   toStorePath = StorePath
   toFilePath x = T.unpack (fromStorePath x)
 
+instance IsStorePath Text where
+  fromStorePath (s) = T.filter (/= '\n') (T.filter (/= '"') s)
+  toStorePath s = s
+
 newtype FlakeDef = FlakeDef [String]
 
 instance IsFlakeDef FlakeDef where
@@ -80,11 +86,6 @@ instance IsFlakeDef FlakeDef where
   toFlakeDef flakepath config name typ = FlakeDef [flakepath <> "#" <> config <> "." <> name <> "." <> "config.system.build" <> "." <> typ]
 
 type OtherOutput = StorePath
-
-data NixSettings = NixSettings
-  { _options :: [String],
-    _storepath :: NixStore
-  }
 
 data NixError
   = P ProcessFailure
@@ -114,6 +115,9 @@ type NixRun e m =
     CliLog m
   )
 
+intToText :: Int -> Text
+intToText = T.toStrict . B.toLazyText . B.decimal
+
 nixRun :: Severity -> CliT NixError IO a -> IO a
 nixRun severity action = do
   cfg <- newCliConfig severity False False (\t -> (T.pack . show $ t, ExitFailure 1))
@@ -140,7 +144,7 @@ nixOSBuildargs flakepath = toFlakeDef flakepath "nixosConfigurations"
 nixDarwinBuildargs :: String -> String -> String -> FlakeDef
 nixDarwinBuildargs flakepath = toFlakeDef flakepath "darwinConfigurations"
 
-runProcess :: NixRun e m => FilePath -> [Text] -> m StorePath
+runProcess :: NixRun e m => FilePath -> [Text] -> m Text
 runProcess com args = do
   toStorePath <$> readProcessAndLogOutput (Debug, Debug) (proc com (map T.unpack args))
 
@@ -158,17 +162,6 @@ runProcessWithSSH port host sargs com = do
 
 withSSH :: NixRun e m => String -> String -> [String] -> [[Text]] -> m ()
 withSSH port host sargs com = mapM_ (\x -> runProcessWithSSH port host sargs x) com
-
-signClosures :: NixRun e m => StorePath -> Text -> m StorePath
-signClosures path key = do
-  withSpinner ("Signing path " <> fromStorePath path) $ do
-    runProcess nixExePath ["store", "sign", "-k", key, fromStorePath path]
-
-copyDeployment :: NixRun e m => Text -> String -> StorePath -> Text -> m OtherOutput
-copyDeployment host name outpath uri = do
-  let nixhost = uri <> host
-  withSpinner ("Copying Deployment for " <> T.pack name) $ do
-    runProcess nixExePath ["copy", "-s", "--to", nixhost, fromStorePath outpath, "--no-check-sigs"]
 
 checkForUser :: NixRun e m => CUid -> m ()
 checkForUser a = do

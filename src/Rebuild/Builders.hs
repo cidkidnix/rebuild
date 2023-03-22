@@ -3,15 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Rebuild.Builders
-  ( buildSystemConfig,
-    switchToConfig,
-    runVM,
-    addSystem,
-    systemBuild,
-    regBuild,
-  )
-where
+module Rebuild.Builders where
 
 import Cli.Extras
 import Control.Monad.IO.Class
@@ -19,37 +11,14 @@ import Data.Monoid as M
 import Data.Text (Text)
 import qualified Data.Text as T
 import Rebuild.Helpers
+import Rebuild.Nix
 
-addSystem :: NixRun e m => FlakeDef -> String -> String -> m StorePath
-addSystem flakedef name profile = do
-  let args =
-        M.mconcat
-          [ commonNixArgs,
-            ["build"],
-            ["--no-link", "--print-out-paths", "--profile", profile],
-            fromFlakeDef flakedef
-          ]
-  withSpinner ("Building System " <> T.pack name <> " and adding to profile " <> T.pack profile) $ do
-    runProcess nixExePath (map T.pack args)
-
-buildSystemConfig :: NixRun e m => String -> String -> String -> m StorePath
-buildSystemConfig flakepath name typ = do
-  let args =
-        M.mconcat
-          [ commonNixArgs,
-            ["build"],
-            fromFlakeDef (nixOSBuildargs flakepath name typ),
-            ["--no-link", "--print-out-paths"]
-          ]
-  withSpinner ("Building System " <> T.pack name) $ do
-    runProcess nixExePath (map T.pack args)
-
-switchToConfig :: NixRun e m => StorePath -> Text -> m StorePath
+switchToConfig :: NixRun e m => StorePath -> Text -> m Text
 switchToConfig path arg = do
   withSpinner ("Switching to " <> fromStorePath path) $ do
     runProcess (toFilePath path <> "/bin/switch-to-configuration") [arg]
 
-runVM :: NixRun e m => StorePath -> String -> m StorePath
+runVM :: NixRun e m => StorePath -> String -> m Text
 runVM path sys = do
   withSpinner "Running VM.. " $ do
     runProcess (toFilePath path <> "/bin/run-" <> sys <> "-vm") []
@@ -64,12 +33,12 @@ systemBuild :: NixRun e m => String -> String -> String -> Text -> m ()
 systemBuild path name profile arg = case arg of
   "switch" -> do
     checkForUser 0
-    sysbuild <- addSystem (nixOSBuildargs path name "toplevel") name profile
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel") (Just (T.pack profile))
     _ <- switchToConfig sysbuild arg
     pure ()
   "boot" -> do
     checkForUser 0
-    sysbuild <- addSystem (nixOSBuildargs path name "toplevel") name profile
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel") (Just (T.pack profile))
     _ <- switchToConfig sysbuild arg
     pure ()
   _ -> pure ()
@@ -77,23 +46,23 @@ systemBuild path name profile arg = case arg of
 regBuild :: NixRun e m => String -> String -> Text -> m ()
 regBuild path name arg = case arg of
   "build" -> do
-    sysbuild <- buildSystemConfig path name "toplevel"
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel") Nothing
     putLog Informational ("System Closure at " <> fromStorePath sysbuild)
     pure ()
   "dry-activate" -> do
-    sysbuild <- buildSystemConfig path name "toplevel"
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel") Nothing
     _ <- switchToConfig sysbuild arg
     pure ()
   "vm" -> do
-    sysbuild <- buildSystemConfig path name "vm"
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "vm") Nothing
     _ <- runVM sysbuild name
     pure ()
   "vm-with-bootloader" -> do
-    sysbuild <- buildSystemConfig path name "vmWithBootLoader"
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "vmWithBootLoader") Nothing
     _ <- runVM sysbuild name
     pure ()
   "build-iso" -> do
-    sysbuild <- buildSystemConfig path name "isoImage"
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "vmWithBootLoader") Nothing
     putLog Informational ("ISO image at " <> fromStorePath sysbuild)
     pure ()
   _ -> pure ()
