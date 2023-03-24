@@ -59,6 +59,7 @@ data NixSettings = NixSettings
     _experimentalFeatures :: [Text],
     _profile :: Maybe Text
   }
+  deriving (Show)
 
 data SSHStore = SSHStore
   { _protoS :: Text,
@@ -173,14 +174,12 @@ testS3Store =
 defaultSettings :: NixSettings
 defaultSettings =
   NixSettings
-    { _options =
-        [ ("cores", "1")
-        ],
+    { _options = [],
       _extraArgs =
         [ "--print-out-paths",
           "--no-link"
         ],
-      _storePath = "daemon",
+      _storePath = parseStoreUri Daemon,
       _experimentalFeatures =
         [ "flakes",
           "nix-command"
