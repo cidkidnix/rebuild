@@ -17,7 +17,7 @@ installToDir root pass path name = do
   checkForUser 0
 
   -- Build and install to system profile in mounted system
-  sysbuild <- installBuild (nixOSBuildargs name path "toplevel") (T.pack root) "/nix/var/nix/profiles/system"
+  sysbuild <- installBuild (nixOSBuildargs name path "toplevel") (defaultSettings {_profile = Just ((T.pack root) <> "/nix/var/nix/profiles/system")})
 
   -- Prepare Chroot
   putLog Informational ("Setting up / -> " <> T.pack root)
@@ -40,6 +40,6 @@ installToDir root pass path name = do
   liftIO $ cleanUpDir root
   pure ()
 
-installBuild :: NixRun e m => FlakeDef -> T.Text -> T.Text -> m StorePath
-installBuild flakedef mountpoint profile = withSpinner "Installing profile ..." $ do
-  buildSystem defaultSettings flakedef (Just (mountpoint <> profile))
+installBuild :: NixRun e m => FlakeDef -> NixSettings -> m StorePath
+installBuild flakedef settings = withSpinner "Installing profile ..." $ do
+  buildSystem settings flakedef

@@ -201,10 +201,10 @@ nixBuild :: NixRun e m => NixSettings -> FlakeDef -> m Text
 nixBuild config flakedef = do
   runProcess nixExePath (["build"] ++ (getNixArgs config) ++ map T.pack (fromFlakeDef flakedef))
 
-buildSystem :: NixRun e m => NixSettings -> FlakeDef -> Maybe Text -> m StorePath
-buildSystem settings flakedef profile = do
+buildSystem :: NixRun e m => NixSettings -> FlakeDef -> m StorePath
+buildSystem settings flakedef = do
   withSpinner ("Building system") $ do
-    toStorePath <$> nixBuild (settings {_profile = profile}) flakedef
+    toStorePath <$> nixBuild settings flakedef
 
 signClosures :: NixRun e m => NixSettings -> StorePath -> Text -> m Text
 signClosures settings path key = do

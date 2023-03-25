@@ -33,12 +33,12 @@ systemBuild :: NixRun e m => String -> String -> String -> Text -> m ()
 systemBuild path name profile arg = case arg of
   "switch" -> do
     checkForUser 0
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel") (Just (T.pack profile))
+    sysbuild <- buildSystem (defaultSettings {_profile = Just (T.pack profile)}) (nixOSBuildargs path name "toplevel")
     _ <- switchToConfig sysbuild arg
     pure ()
   "boot" -> do
     checkForUser 0
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel") (Just (T.pack profile))
+    sysbuild <- buildSystem (defaultSettings {_profile = Just (T.pack profile)}) (nixOSBuildargs path name "toplevel")
     _ <- switchToConfig sysbuild arg
     pure ()
   _ -> pure ()
@@ -46,23 +46,23 @@ systemBuild path name profile arg = case arg of
 regBuild :: NixRun e m => String -> String -> Text -> m ()
 regBuild path name arg = case arg of
   "build" -> do
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel") Nothing
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel")
     putLog Informational ("System Closure at " <> fromStorePath sysbuild)
     pure ()
   "dry-activate" -> do
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel") Nothing
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel")
     _ <- switchToConfig sysbuild arg
     pure ()
   "vm" -> do
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "vm") Nothing
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "vm")
     _ <- runVM sysbuild name
     pure ()
   "vm-with-bootloader" -> do
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "vmWithBootLoader") Nothing
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "vmWithBootLoader")
     _ <- runVM sysbuild name
     pure ()
   "build-iso" -> do
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "vmWithBootLoader") Nothing
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "vmWithBootLoader")
     putLog Informational ("ISO image at " <> fromStorePath sysbuild)
     pure ()
   _ -> pure ()
