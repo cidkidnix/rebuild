@@ -12,10 +12,10 @@ import qualified Data.Text as T
 import Rebuild.Helpers
 import Rebuild.Nix
 
-buildDarwinSystem :: NixRun e m => NixSettings -> FlakeDef -> Maybe Text -> m Text
-buildDarwinSystem settings flakedef profile = do
+buildDarwinSystem :: NixRun e m => NixSettings -> FlakeDef -> m Text
+buildDarwinSystem settings flakedef = do
   withSpinner ("Building system") $ do
-    nixBuild (settings {_profile = profile}) flakedef
+    nixBuild settings flakedef
 
 switchToConfig :: NixRun e m => Text -> m Text
 switchToConfig path = do
@@ -26,7 +26,7 @@ darwinBuild :: NixRun e m => String -> String -> String -> String -> m ()
 darwinBuild path name profile arg = case arg of
   "switch" -> do
     checkForUser 0
-    sysbuild <- buildDarwinSystem defaultSettings (nixDarwinBuildargs path name "toplevel") (Just (T.pack profile))
+    sysbuild <- buildDarwinSystem (defaultSettings {_profile = Just (T.pack profile)}) (nixDarwinBuildargs path name "toplevel")
     _ <- switchToConfig sysbuild
     pure ()
   _ -> pure ()
@@ -34,7 +34,7 @@ darwinBuild path name profile arg = case arg of
 regDarwinBuild :: NixRun e m => String -> String -> String -> m ()
 regDarwinBuild path name arg = case arg of
   "build" -> do
-    sysbuild <- buildDarwinSystem defaultSettings (nixDarwinBuildargs path name "toplevel") Nothing
+    sysbuild <- buildDarwinSystem defaultSettings (nixDarwinBuildargs path name "toplevel")
     putLog Informational ("System Closure at " <> fromStorePath sysbuild)
     pure ()
   _ -> pure ()
