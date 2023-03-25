@@ -25,7 +25,7 @@ deployConfig doSign path name host port key = do
             _sshHost = T.pack host,
             _sshPort = Nothing
           }
-  build <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel") Nothing
+  build <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel")
   _ <- copyDeployment (SSHStoreURI sshURI) name build
   _ <- installProfileRemote host build
 
