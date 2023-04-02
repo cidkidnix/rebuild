@@ -6,7 +6,6 @@ module Rebuild.Deploy (deployConfig) where
 
 import Cli.Extras
 import qualified Data.Text as T
-import Rebuild.Builders
 import Rebuild.Helpers
 import Rebuild.Nix
 
