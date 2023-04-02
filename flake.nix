@@ -42,8 +42,9 @@
       packages = ps: with ps; [ rebuild ];
       nativeBuildInputs = with pkgs'.${system}; [
         cabal-install
+        haskell-language-server
       ];
-      withHoogle = false;
+      withHoogle = true;
     });
   };
 }
