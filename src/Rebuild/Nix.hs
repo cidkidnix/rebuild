@@ -1,28 +1,19 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE LambdaCase #-}
+
+
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
+
 
 module Rebuild.Nix where
 
 import Cli.Extras
-import Control.Lens
-import Control.Monad
-import Control.Monad.Catch
-import Control.Monad.IO.Class
 import Data.Maybe
 import Data.Monoid as M
-import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
 import Rebuild.Helpers
-import System.Exit
-import System.Posix.Types
-import System.Posix.User
-import System.Which
 
 class NixConfig a where
   getOptions :: a -> [(Text, Text)]
@@ -85,39 +76,32 @@ data S3Store = S3Store
   deriving (Show)
 
 instance NixConfig NixSettings where
-  getOptions p = _options p
-  getStorePath p = _storePath p
-  getExtraArgs p = _extraArgs p
-  getExperimentalFeatures p = _experimentalFeatures p
-  getProfile p = _profile p
   getStoreRoot p = T.replace "nix/store" "" (_storePath p)
+  getOptions = _options
+  getStorePath = _storePath
+  getExtraArgs = _extraArgs
+  getExperimentalFeatures = _experimentalFeatures
+  getProfile = _profile
 
 instance SSHConfig SSHStore where
-  getProtoS p = _protoS p
-  getHost p = _sshHost p
-  getPortS p = _sshPort p
   getFullUriS p =
-    ( _protoS p
+    _protoS p
         <> _sshHost p
         <> maybeIntToText (_sshPort p) (":" <> intToText (fromJust (_sshPort p)))
-    )
+  getProtoS = _protoS
+  getHost = _sshHost
+  getPortS = _sshPort
 
 instance HTTPConfig HTTPStore where
-  getProtoH p = _protoH p
-  getSite p = _site p
-  getPortH p = _port p
   getFullUriH p =
-    ( _protoH p
+    _protoH p
         <> _site p
         <> maybeIntToText (_port p) (":" <> intToText (fromJust (_port p)))
-    )
+  getSite = _site
+  getPortH = _port
+  getProtoH = _protoH
 
 instance S3Config S3Store where
-  getBucket p = _bucket p
-  getProfileB p = _profileB p
-  getRegion p = _region p
-  getScheme p = _scheme p
-  getEndpoint p = _endpoint p
   getFullUri3 p =
     "s3://"
       <> _bucket p
@@ -125,6 +109,11 @@ instance S3Config S3Store where
       <> maybeText (_region p) ("?region=" <> fromJust (_region p))
       <> maybeText (_scheme p) ("?scheme=" <> fromJust (_scheme p))
       <> maybeText (_endpoint p) ("?endpoint=" <> fromJust (_endpoint p))
+  getBucket = _bucket
+  getProfileB = _profileB
+  getRegion = _region
+  getScheme = _scheme
+  getEndpoint = _endpoint
 
 data StoreURI
   = S3StoreURI S3Store
@@ -140,10 +129,10 @@ parseStoreUri p = case p of
   Daemon -> "daemon"
 
 maybeText :: Maybe Text -> Text -> Text
-maybeText b c = if b == Nothing then "" else c
+maybeText b c = if isNothing b then "" else c
 
 maybeIntToText :: Maybe Int -> Text -> Text
-maybeIntToText b c = if b == Nothing then "" else c
+maybeIntToText b c = if isNothing b then "" else c
 
 testSSHStore :: SSHStore
 testSSHStore =
@@ -190,28 +179,24 @@ defaultSettings =
 getNixArgs :: NixSettings -> [Text]
 getNixArgs settings =
   M.mconcat
-    [ (concatMap (\x -> ["--option", fst x, snd x]) (getOptions settings)),
+    [ concatMap (\x -> ["--option", fst x, snd x]) (getOptions settings),
       getExtraArgs settings,
       ["--store", getStoreRoot settings],
-      (concatMap (\x -> ["--extra-experimental-features", x]) (getExperimentalFeatures settings)),
-      (if (getProfile settings) == Nothing then [] else ["--profile", fromJust (getProfile settings)])
+      concatMap (\x -> ["--extra-experimental-features", x]) (getExperimentalFeatures settings),
+      if isNothing (getProfile settings) then [] else ["--profile", fromJust (getProfile settings)]
     ]
 
 nixBuild :: NixRun e m => NixSettings -> FlakeDef -> m Text
-nixBuild config flakedef = do
-  runProcess nixExePath (["build"] ++ (getNixArgs config) ++ map T.pack (fromFlakeDef flakedef))
+nixBuild config flakedef = runProcess nixExePath (["build"] ++ (getNixArgs config) ++ map T.pack (fromFlakeDef flakedef))
 
 buildSystem :: NixRun e m => NixSettings -> FlakeDef -> m StorePath
-buildSystem settings flakedef = do
-  withSpinner ("Building system") $ do
-    toStorePath <$> nixBuild settings flakedef
+buildSystem settings flakedef = withSpinner ("Building system") $ do
+  toStorePath <$> nixBuild settings flakedef
 
 signClosures :: NixRun e m => NixSettings -> StorePath -> Text -> m Text
-signClosures settings path key = do
-  withSpinner ("Signing path " <> fromStorePath path) $ do
-    runProcess nixExePath (getNixArgs settings ++ ["store", "sign", "-k", key, fromStorePath path])
+signClosures settings path key = withSpinner ("Signing path " <> fromStorePath path) $ do
+  runProcess nixExePath (getNixArgs settings ++ ["store", "sign", "-k", key, fromStorePath path])
 
 copyDeployment :: NixRun e m => StoreURI -> String -> StorePath -> m Text
-copyDeployment uri name outpath = do
-  withSpinner ("Copying Deployment for " <> T.pack name) $ do
-    runProcess nixExePath ["copy", "-s", "--to", parseStoreUri uri, fromStorePath outpath, "--no-check-sigs"]
+copyDeployment uri name outpath = withSpinner ("Copying Deployment for " <> T.pack name) $ do
+  runProcess nixExePath ["copy", "-s", "--to", parseStoreUri uri, fromStorePath outpath, "--no-check-sigs"]
