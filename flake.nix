@@ -1,6 +1,10 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    mars = {
+      url = "github:reflex-frp/reflex-platform/mars_obelisk";
+      flake = false;
+    };
   };
 
   outputs = inputs: let
@@ -10,41 +14,39 @@
       "aarch64-linux"
       "x86_64-darwin"
     ];
-    pkgs' = supportedSystems (system: import "${inputs.nixpkgs}" {
+    pkgs' = supportedSystems (system: import "${inputs.nixpkgs}" { 
       inherit system;
-      overlays = [
-        (final: prev: with prev.haskell.lib; {
-          haskellPackages = prev.haskellPackages.override {
-            overrides = self: super: {
-            rebuild = overrideCabal (super.callCabal2nix "rebuild" ./. { }) (drv: {
-              postInstall = ''
-                mkdir -p $out/share/{bash,zsh}-completion/completions
-                $out/bin/rebuild --zsh-completion-script $out/bin/rebuild > $out/share/zsh-completion/completions/rebuild
-                $out/bin/rebuild --bash-completion-script $out/bin/rebuild > $out/share/bash-completion/completions/rebuild
-              '';
-              librarySystemDepends = with super; [
-                prev.nix
-                prev.openssh
-              ];
-            });
-          };
-        };
-        })
-      ];
     });
   in rec {
     packages = supportedSystems (system: let
-      pkgs = pkgs'.${system};
+      marsProject = import inputs.mars { 
+        inherit system;
+      };
+      proj = marsProject ({ pkgs, ... }: {
+        name = "rebuild";
+        src = ./.;
+        compiler-nix-name = "ghc926";
+        overrides = [
+          ({ config, lib, pkgs, ... }: { 
+            packages.rebuild.components.library.build-tools = [
+              pkgs.nix
+              pkgs.openssh
+            ];
+          })
+        ];
+        shellTools = {
+          cabal = "3.6.2.0";
+          haskell-language-server = "1.9.1.0";
+        };
+        shells = ps: with ps; [
+          rebuild
+        ];
+      });
     in {
-      rebuild = pkgs.haskellPackages.rebuild;
+      rebuild = proj.hsPkgs.rebuild.components.exes.rebuild;
+      inherit proj;
     });
-    devShell = supportedSystems (system: pkgs'.${system}.haskellPackages.shellFor {
-      packages = ps: with ps; [ rebuild ];
-      nativeBuildInputs = with pkgs'.${system}; [
-        cabal-install
-        haskell-language-server
-      ];
-      withHoogle = true;
-    });
+
+    devShell = supportedSystems (system: packages.${system}.proj.shells.ghc);
   };
 }

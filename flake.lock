@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "mars": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1680519950,
+        "narHash": "sha256-q5RWbSGULwF0lw2glywP2Dt4yLHg24hw+pzO30M8ask=",
+        "owner": "reflex-frp",
+        "repo": "reflex-platform",
+        "rev": "01801a8f31c156352150b0c497c02333b0fa9f8b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "reflex-frp",
+        "ref": "mars_obelisk",
+        "repo": "reflex-platform",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1677063315,
@@ -18,6 +35,7 @@
     },
     "root": {
       "inputs": {
+        "mars": "mars",
         "nixpkgs": "nixpkgs"
       }
     }
