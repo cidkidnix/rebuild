@@ -62,7 +62,7 @@ regBuild path name arg = case arg of
     _ <- runVM sysbuild name
     pure ()
   "build-iso" -> do
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "vmWithBootLoader")
+    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "isoImage")
     putLog Informational ("ISO image at " <> fromStorePath sysbuild)
     pure ()
   _ -> pure ()
