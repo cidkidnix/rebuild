@@ -1,7 +1,9 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
+{- ORMOLU_DISABLE -}
 
 module Rebuild.Cli
   ( optsParser,
@@ -14,7 +16,6 @@ module Rebuild.Cli
     dryCommand,
     deploy,
     deployOpts,
-    nixInstall,
     nixInstallOpts,
     impl,
     Opts,
@@ -25,41 +26,21 @@ where
 import Cli.Extras
 import Options.Applicative
 import Rebuild.Builders
-import Rebuild.Deploy
+--import Rebuild.Deploy
 import Rebuild.Helpers
+import Rebuild.Types
 
 -- Ugly hacks to get darwin to be the default
 -- and not depend on linux-mount on all platforms
 -- we still want the darwin code on non-darwin system
 -- since it's not darwin-specific (somewhat)
 #if !defined(darwin_HOST_OS)
-import Rebuild.Install
-import Rebuild.Darwin hiding (installToDir)
 #elif defined(darwin_HOST_OS)
 import Rebuild.Darwin
 
 switchTrue :: Mod FlagFields Bool -> Parser Bool
 switchTrue = flag True False
 #endif
-
-data Opts = Opts
-  { configpath :: !String,
-    nixsystem :: !String,
-    verbose :: !Bool,
-    darwin :: !Bool,
-    scommand :: !Command
-  }
-
-data Command
-  = Build
-  | VM
-  | VMWithBootLoader
-  | DryActivate
-  | Switch String
-  | Boot String
-  | BuildISO
-  | Deploy String String String Bool
-  | NixOSInstall String Bool
 
 genCommandCli :: String -> String -> Command -> Mod CommandFields Command
 genCommandCli a b c =
@@ -99,6 +80,7 @@ programOptions hostname =
           <> showDefault
           <> value hostname
       )
+    <*> switch (long "legacy")
     <*> switch (long "verbose")
 #if defined(darwin_HOST_OS)
     <*> switchTrue (long "darwin")
@@ -178,12 +160,27 @@ systemOptsB :: Parser Command
 systemOptsB =
   Boot <$> strOption (long "profile" <> value "/nix/var/nix/profiles/system" <> help "Profile to install to" <> showDefault)
 
+collectOptions :: Opts -> Options
+collectOptions opts = Options {
+  path = configpath opts,
+  name = nixsystem opts,
+  com = scommand opts
+                         }
+
 impl :: String -> IO ()
 impl hostname = do
   opts <- execParser (optsParser hostname)
   let severity = case verbose opts of
         True -> Debug
         False -> Informational
+      colOpts = collectOptions opts
+
+  --nixRun severity $ regBuild colOpts
+  case legacy opts of
+    False -> nixRun severity $ flakeBuild colOpts
+    True -> nixRun severity $ legacyBuild colOpts
+
+{-
   case darwin opts of
     True -> nixRun severity $ case scommand opts of
       Switch profile -> darwinBuild (configpath opts) (nixsystem opts) profile "switch"
@@ -205,3 +202,4 @@ impl hostname = do
       BuildISO -> regBuild (configpath opts) (nixsystem opts) "build-iso"
       NixOSInstall root pass -> installToDir root pass (configpath opts) (nixsystem opts)
       Deploy sys port key doSign -> deployConfig doSign (configpath opts) (nixsystem opts) sys port key
+-}

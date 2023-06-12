@@ -1,68 +1,70 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Rebuild.Builders where
 
 import Cli.Extras
-import Control.Monad.IO.Class
-import Data.Monoid as M
 import Data.Text (Text)
 import qualified Data.Text as T
+import Rebuild.Flake
 import Rebuild.Helpers
 import Rebuild.Nix
+import Rebuild.Types
 
-switchToConfig :: NixRun e m => StorePath -> Text -> m Text
-switchToConfig path arg = do
-  withSpinner ("Switching to " <> fromStorePath path) $ do
-    runProcess (toFilePath path <> "/bin/switch-to-configuration") [arg]
+parseSwitchCommand :: SwitchCommand -> Text
+parseSwitchCommand a = case a of
+  B -> "boot"
+  S -> "switch"
+  D -> "dry-activate"
+
+switchToConfig :: NixRun e m => StorePath -> SwitchCommand -> m Text
+switchToConfig path' arg = do
+  withSpinner ("Switching to " <> fromStorePath path') $ do
+    runProcess (toFilePath path' <> "/bin/switch-to-configuration") [(parseSwitchCommand arg)]
 
 runVM :: NixRun e m => StorePath -> String -> m Text
-runVM path sys = do
+runVM path' sys = do
   withSpinner "Running VM.. " $ do
-    runProcess (toFilePath path <> "/bin/run-" <> sys <> "-vm") []
+    runProcess (toFilePath path' <> "/bin/run-" <> sys <> "-vm") []
 
--- systemBuild and regBuild are split, because when we switch or boot to a new configuration
--- we have to add it to the system profile, we don't want to do this if we just build
--- the closure or build a VM, since those don't need to be added to the system profile
--- and subsequently the bootloader
---
--- Also we need to pass the profile to systemBuild
-systemBuild :: NixRun e m => String -> String -> String -> Text -> m ()
-systemBuild path name profile arg = case arg of
-  "switch" -> do
-    checkForUser 0
-    sysbuild <- buildSystem (defaultSettings {_profile = Just (T.pack profile)}) (nixOSBuildargs path name "toplevel")
-    _ <- switchToConfig sysbuild arg
-    pure ()
-  "boot" -> do
-    checkForUser 0
-    sysbuild <- buildSystem (defaultSettings {_profile = Just (T.pack profile)}) (nixOSBuildargs path name "toplevel")
-    _ <- switchToConfig sysbuild arg
-    pure ()
-  _ -> pure ()
+legacyBuild :: NixRun e m => Options -> m ()
+legacyBuild opts = case opts.com of
+  _ -> failWith "Not implemented yet"
 
-regBuild :: NixRun e m => String -> String -> Text -> m ()
-regBuild path name arg = case arg of
-  "build" -> do
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel")
+flakeBuild :: NixRun e m => Options -> m ()
+flakeBuild opts = case opts.com of
+  Build -> do
+    sysbuild <- buildFlakeSystem defaultSettings (nixOSBuildargs opts.path opts.name "toplevel")
     putLog Informational ("System Closure at " <> fromStorePath sysbuild)
     pure ()
-  "dry-activate" -> do
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "toplevel")
-    _ <- switchToConfig sysbuild arg
+  DryActivate -> do
+    sysbuild <- buildFlakeSystem defaultSettings (nixOSBuildargs opts.path opts.name "toplevel")
+    _ <- switchToConfig sysbuild D
     pure ()
-  "vm" -> do
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "vm")
-    _ <- runVM sysbuild name
+  VM -> do
+    sysbuild <- buildFlakeSystem defaultSettings (nixOSBuildargs opts.path opts.name "vm")
+    _ <- runVM sysbuild opts.name
     pure ()
-  "vm-with-bootloader" -> do
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "vmWithBootLoader")
-    _ <- runVM sysbuild name
+  VMWithBootLoader -> do
+    sysbuild <- buildFlakeSystem defaultSettings (nixOSBuildargs opts.path opts.name "vmWithBootLoader")
+    _ <- runVM sysbuild opts.name
     pure ()
-  "build-iso" -> do
-    sysbuild <- buildSystem defaultSettings (nixOSBuildargs path name "isoImage")
+  BuildISO -> do
+    sysbuild <- buildFlakeSystem defaultSettings (nixOSBuildargs opts.path opts.name "isoImage")
     putLog Informational ("ISO image at " <> fromStorePath sysbuild)
+    pure ()
+  Switch profile -> do
+    checkForUser 0
+    sysbuild <- buildFlakeSystem (defaultSettings {_profile = Just (T.pack profile)}) (nixOSBuildargs opts.path opts.name "toplevel")
+    _ <- switchToConfig sysbuild S
+    pure ()
+  Boot profile -> do
+    checkForUser 0
+    sysbuild <- buildFlakeSystem (defaultSettings {_profile = Just (T.pack profile)}) (nixOSBuildargs opts.path opts.name "toplevel")
+    _ <- switchToConfig sysbuild B
     pure ()
   _ -> pure ()

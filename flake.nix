@@ -14,12 +14,12 @@
       "aarch64-linux"
       "x86_64-darwin"
     ];
-    pkgs' = supportedSystems (system: import "${inputs.nixpkgs}" { 
+    pkgs' = supportedSystems (system: import "${inputs.nixpkgs}" {
       inherit system;
     });
   in rec {
     packages = supportedSystems (system: let
-      marsProject = import inputs.mars { 
+      marsProject = import inputs.mars {
         inherit system;
       };
       proj = marsProject ({ pkgs, ... }: {
@@ -27,7 +27,7 @@
         src = ./.;
         compiler-nix-name = "ghc926";
         overrides = [
-          ({ config, lib, pkgs, ... }: { 
+          ({ config, lib, pkgs, ... }: {
             packages.rebuild.components.library.build-tools = [
               pkgs.nix
               pkgs.openssh
@@ -37,6 +37,7 @@
         shellTools = {
           cabal = "3.6.2.0";
           haskell-language-server = "1.9.1.0";
+          ghcid = "0.8.8";
         };
         shells = ps: with ps; [
           rebuild

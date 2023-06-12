@@ -3,3 +3,5 @@ dist*
 result*
 *.qcow2
 .direnv
+tags
+TAGS
