@@ -1,18 +1,15 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase #-}
-
 module Rebuild.Builders where
 
 import Cli.Extras
+import Control.Monad
 import Data.Text (Text)
+import Data.Time
 import qualified Data.Text as T
+
 import Rebuild.Flake
 import Rebuild.Helpers
 import Rebuild.Nix
+import Rebuild.GC
 import Rebuild.Types
 
 parseSwitchCommand :: SwitchCommand -> Text
@@ -24,7 +21,7 @@ parseSwitchCommand a = case a of
 switchToConfig :: NixRun e m => StorePath -> SwitchCommand -> m Text
 switchToConfig path' arg = do
   withSpinner ("Switching to " <> fromStorePath path') $ do
-    runProcess (toFilePath path' <> "/bin/switch-to-configuration") [(parseSwitchCommand arg)]
+    runProcess (toFilePath path' <> "/bin/switch-to-configuration") [parseSwitchCommand arg]
 
 runVM :: NixRun e m => StorePath -> String -> m Text
 runVM path' sys = do
@@ -32,8 +29,7 @@ runVM path' sys = do
     runProcess (toFilePath path' <> "/bin/run-" <> sys <> "-vm") []
 
 legacyBuild :: NixRun e m => Options -> m ()
-legacyBuild opts = case opts.com of
-  _ -> failWith "Not implemented yet"
+legacyBuild _ = failWith "Not implemented yet"
 
 flakeBuild :: NixRun e m => Options -> m ()
 flakeBuild opts = case opts.com of
@@ -67,4 +63,18 @@ flakeBuild opts = case opts.com of
     sysbuild <- buildFlakeSystem (defaultSettings {_profile = Just (T.pack profile)}) (nixOSBuildargs opts.path opts.name "toplevel")
     _ <- switchToConfig sysbuild B
     pure ()
+  GC f t dryRun olderThan -> do
+    unless dryRun $
+        checkForUser 0
+
+    when (f /= 0 && t /= 0 && olderThan == 0) $ do
+        filepaths <- collectSystems f t
+        runSystemGarbageCollect dryRun filepaths
+
+    when (olderThan /= 0) $ do
+        fps <- timeCollectSystems $ secondsToNominalDiffTime olderThan
+        case fps of
+          [] -> do putLog Alert "Nothing to do!"
+          _ -> runSystemGarbageCollect dryRun fps
+
   _ -> pure ()

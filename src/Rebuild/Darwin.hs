@@ -1,26 +1,22 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Rebuild.Darwin where
 
 import Cli.Extras
 import Data.Text (Text)
 import qualified Data.Text as T
+import System.FilePath
 import Rebuild.Helpers
 import Rebuild.Nix
 import Rebuild.Types
 
 buildDarwinSystem :: NixRun e m => NixSettings -> FlakeDef -> m Text
 buildDarwinSystem settings flakedef = do
-  withSpinner ("Building system") $ do
+  withSpinner "Building system" $ do
     nixBuild settings flakedef
 
 switchToConfig :: NixRun e m => Text -> m Text
 switchToConfig path' = do
   withSpinner ("Switching to " <> fromStorePath path') $ do
-    runProcess (toFilePath path' <> "/activate") []
+    runProcess (toFilePath path' </> "activate") []
 
 darwinBuild :: NixRun e m => String -> String -> String -> String -> m ()
 darwinBuild path' name' profile arg = case arg of

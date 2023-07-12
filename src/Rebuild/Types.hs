@@ -1,9 +1,3 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module Rebuild.Types where
 
 import Cli.Extras
@@ -12,6 +6,7 @@ import Control.Monad.IO.Class
 import Data.Text as T
 import Data.Maybe
 import Data.String
+import Data.Fixed
 import qualified Data.Text.Lazy as T (toStrict)
 import qualified Data.Text.Lazy.Builder as B
 import qualified Data.Text.Lazy.Builder.Int as B
@@ -48,6 +43,7 @@ data Command
   | BuildISO
   | Deploy String String String Bool
   | NixOSInstall String Bool
+  | GC Int Int Bool Pico
 
 -- Nix types
 class NixConfig a where
@@ -174,9 +170,9 @@ instance IsStorePath StorePath where
   toFilePath x = T.unpack (fromStorePath x)
 
 instance IsStorePath Text where
-  fromStorePath (s) = T.filter (/= '\n') (T.filter (/= '"') s)
+  fromStorePath s = T.filter (/= '\n') (T.filter (/= '"') s)
   toStorePath s = s
-  toFilePath s = T.unpack s
+  toFilePath = T.unpack
 
 instance IsFlakeDef FlakeDef where
   fromFlakeDef (FlakeDef s) = s

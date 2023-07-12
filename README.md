@@ -12,6 +12,7 @@
 - Installing NixOS
 - Deploying to remote machine accessable via SSH, with root user access
 - Nix-Darwin (switch), no support for activate-user yet
+- Easy garbage collection of system(s)
 
 <h2 align="left">TODO</h1>
 

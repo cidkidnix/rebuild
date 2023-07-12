@@ -1,39 +1,9 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-
-module Rebuild.Helpers
-  ( checkForUser,
-    nixExePath,
-    commonNixArgs,
-    runProcess,
-    nixRun,
-    runProcessWithSSH,
-    withSSH,
-    nixEnvPath,
-    nixOSBuildargs,
-    nixDarwinBuildargs,
-    fromFlakeDef,
-    toFlakeDef,
-    fromStorePath,
-    toStorePath,
-    toFilePath,
-    intToText,
-    NixRun,
-    NixStore,
-    StorePath,
-    FlakeDef,
-    OtherOutput,
-  )
-where
+module Rebuild.Helpers where
 
 import Cli.Extras
 import Control.Lens
 import Control.Monad.IO.Class
+import Control.Monad (forM_)
 import Data.Monoid as M
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -52,6 +22,9 @@ nixRun severity action = do
 
 nixExePath :: FilePath
 nixExePath = $(staticWhich "nix")
+
+nixCollectGarbage :: FilePath
+nixCollectGarbage = $(staticWhich "nix-collect-garbage")
 
 sshExePath :: FilePath
 sshExePath = $(staticWhich "ssh")
@@ -88,12 +61,13 @@ runProcessWithSSH port host sargs com' = do
   toStorePath <$> readProcessAndLogOutput (Debug, Debug) (proc cmd args')
 
 withSSH :: NixRun e m => String -> String -> [String] -> [[Text]] -> m ()
-withSSH port host sargs com' = mapM_ (\x -> runProcessWithSSH port host sargs x) com'
+withSSH port host sargs com' = forM_ com' $ \x ->
+  runProcessWithSSH port host sargs x
 
 checkForUser :: NixRun e m => CUid -> m ()
 checkForUser a = do
-  root <- fmap (== a) (liftIO $ getRealUserID)
-  case root of
-    False -> do
-      failWith "Not Root, Exiting"
-    _ -> pure ()
+  root <- fmap (== a) (liftIO getRealUserID)
+  if root then
+    pure ()
+  else
+    failWith "Not Root, Exiting"

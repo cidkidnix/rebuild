@@ -14,9 +14,6 @@
       "aarch64-linux"
       "x86_64-darwin"
     ];
-    pkgs' = supportedSystems (system: import "${inputs.nixpkgs}" {
-      inherit system;
-    });
   in rec {
     packages = supportedSystems (system: let
       marsProject = import inputs.mars {

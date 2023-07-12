@@ -1,8 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings #-}
 {- ORMOLU_DISABLE -}
 
 module Rebuild.Cli
@@ -26,7 +22,6 @@ where
 import Cli.Extras
 import Options.Applicative
 import Rebuild.Builders
---import Rebuild.Deploy
 import Rebuild.Helpers
 import Rebuild.Types
 
@@ -89,14 +84,15 @@ programOptions hostname =
 #endif
     <*> hsubparser
       ( switchCommand
-          <> buildCommand
-          <> vmCommand
-          <> vmWBLCommand
-          <> dryCommand
-          <> bootCommand
-          <> buildISOCommand
-          <> nixInstall
-          <> deploy
+        <> buildCommand
+        <> vmCommand
+        <> vmWBLCommand
+        <> dryCommand
+        <> bootCommand
+        <> buildISOCommand
+        <> nixInstall
+        <> deploy
+        <> gc
       )
 
 switchCommand :: Mod CommandFields Command
@@ -139,6 +135,18 @@ deployOpts =
     <*> strOption (long "port" <> value "22" <> metavar "SSH port")
     <*> strOption (long "key" <> value "example" <> metavar "Signing Key")
     <*> switch (long "sign")
+
+gc :: Mod CommandFields Command
+gc = command "gc"
+    (info gcOpts (progDesc "Garbage Collect your systems!"))
+
+gcOpts :: Parser Command
+gcOpts =
+    GC
+      <$> option auto (long "from" <> value 0 <> help "First link to attempt to remove")
+      <*> option auto (long "to" <> value 0 <> help "Last link to attempt to remove")
+      <*> switch (long "dry-run" <> help "Show what would have been done, doesn't actually run GC operation")
+      <*> option auto (long "older-than" <> value 0 <> help "Delete all systems older than a specified amount of days")
 
 nixInstall :: Mod CommandFields Command
 nixInstall =

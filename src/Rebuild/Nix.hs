@@ -1,8 +1,3 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Rebuild.Nix where
 
 import Cli.Extras
@@ -73,7 +68,7 @@ getNixArgs settings =
     ]
 
 nixBuild :: NixRun e m => NixSettings -> FlakeDef -> m Text
-nixBuild config flakedef = runProcess nixExePath (["build"] ++ (getNixArgs config) ++ map T.pack (fromFlakeDef flakedef))
+nixBuild config flakedef = runProcess nixExePath (["build"] <> getNixArgs config <> map T.pack (fromFlakeDef flakedef))
 
 buildSystem :: NixRun e m => NixSettings -> FlakeDef -> m StorePath
 buildSystem settings flakedef = withSpinner "Building system" $ do
@@ -81,7 +76,7 @@ buildSystem settings flakedef = withSpinner "Building system" $ do
 
 signClosures :: NixRun e m => NixSettings -> StorePath -> Text -> m Text
 signClosures settings path' key = withSpinner ("Signing path " <> fromStorePath path') $ do
-  runProcess nixExePath (getNixArgs settings ++ ["store", "sign", "-k", key, fromStorePath path'])
+  runProcess nixExePath (getNixArgs settings <> ["store", "sign", "-k", key, fromStorePath path'])
 
 copyDeployment :: NixRun e m => StoreURI -> String -> StorePath -> m Text
 copyDeployment uri name' outpath = withSpinner ("Copying Deployment for " <> T.pack name') $ do
