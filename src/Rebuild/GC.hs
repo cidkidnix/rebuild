@@ -13,7 +13,7 @@ import Rebuild.Helpers
 import Rebuild.Types
 
 data SystemLink = GarbageCollect FilePath
-                 | NoCollect FilePath Reason
+                | NoCollect FilePath Reason
     deriving (Show, Eq)
 
 data Reason = InvalidPath
