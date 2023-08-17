@@ -43,7 +43,7 @@ data Command
   | BuildISO
   | Deploy String String String Bool
   | NixOSInstall String Bool
-  | GC Int Int Bool Pico
+  | GC Int Int Bool String
 
 -- Nix types
 class NixConfig a where

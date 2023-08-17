@@ -146,7 +146,7 @@ gcOpts =
       <$> option auto (long "from" <> value 0 <> help "First link to attempt to remove")
       <*> option auto (long "to" <> value 0 <> help "Last link to attempt to remove")
       <*> switch (long "dry-run" <> help "Show what would have been done, doesn't actually run GC operation")
-      <*> option auto (long "older-than" <> value 0 <> help "Delete all systems older than a specified amount of days")
+      <*> strOption (long "older-than" <> value "1d" <> help "Delete all systems older than a specified amount of days")
 
 nixInstall :: Mod CommandFields Command
 nixInstall =

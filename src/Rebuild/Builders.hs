@@ -3,7 +3,6 @@ module Rebuild.Builders where
 import Cli.Extras
 import Control.Monad
 import Data.Text (Text)
-import Data.Time
 import qualified Data.Text as T
 
 import Rebuild.Flake
@@ -64,15 +63,19 @@ flakeBuild opts = case opts.com of
     _ <- switchToConfig sysbuild B
     pure ()
   GC f t dryRun olderThan -> do
+    a <- case textToMaybeInteger (T.pack olderThan) of
+                      Nothing -> failWith "Need to be <num>d"
+                      Just a -> pure a
+    let olderThanNum = timeToSeconds a
     unless dryRun $
         checkForUser 0
 
-    when (f /= 0 && t /= 0 && olderThan == 0) $ do
+    when (f /= 0 && t /= 0 && olderThanNum == 0) $ do
         filepaths <- collectSystems f t
         runSystemGarbageCollect dryRun filepaths
 
-    when (olderThan /= 0) $ do
-        fps <- timeCollectSystems $ secondsToNominalDiffTime olderThan
+    when (olderThanNum /= 0) $ do
+        fps <- timeCollectSystems $ T.pack olderThan
         case fps of
           [] -> do putLog Alert "Nothing to do!"
           _ -> runSystemGarbageCollect dryRun fps

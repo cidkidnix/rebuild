@@ -7,6 +7,7 @@ import Control.Monad (forM_)
 import Data.Monoid as M
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Read as T
 import Rebuild.Types
 import System.Exit
 import System.Posix.Types
@@ -71,3 +72,32 @@ checkForUser a = do
     pure ()
   else
     failWith "Not Root, Exiting"
+
+textToMaybeInteger :: Text -> Maybe (Integer, Time)
+textToMaybeInteger days = case T.decimal days of
+            Left _ -> Nothing
+            Right (num, letter) -> case letter of
+                                     "d" -> Just (num, Day)
+                                     "w" -> Just (num, Week)
+                                     "m" -> Just (num, Month)
+                                     _ -> Nothing
+
+data Time = Day
+          | Week
+          | Month
+  deriving (Show, Eq, Ord)
+
+dayInMinutes :: Integer
+dayInMinutes = 1440
+
+weekInMinutes :: Integer
+weekInMinutes = 10080
+
+monthInMinutes :: Integer
+monthInMinutes = 43800
+
+timeToSeconds :: (Integer, Time) -> Integer
+timeToSeconds a = case snd a of
+                    Week ->  weekInMinutes * fst a * 60
+                    Day -> dayInMinutes * fst a * 60
+                    Month -> monthInMinutes * fst a * 60

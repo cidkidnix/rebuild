@@ -4,6 +4,7 @@ import Cli.Extras
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.List qualified as L
+import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Time.Clock
 import System.Directory
@@ -55,23 +56,28 @@ runSystemGarbageCollect dryRun fp = do
         _ <- runProcess nixCollectGarbage []
         pure ()
 
-timeCollectSystems :: NixRun e m => NominalDiffTime -> m [SystemLink]
-timeCollectSystems tt = do
+timeCollectSystems :: NixRun e m => Text -> m [SystemLink]
+timeCollectSystems timed = do
+    timeI <- case textToMaybeInteger timed of
+            Nothing -> failWith $ "String " <> timed <> " didn't start with a number!"
+            Just a -> pure a
+    let tt = fromInteger $ timeToSeconds timeI
+
     paths <- liftIO $ listDirectory "/nix/var/nix/profiles"
     let links = L.sort $ filter (\x -> "system-" `T.isPrefixOf` x) (map T.pack paths)
     currentTime <- liftIO getCurrentTime
     t <- forM links $ \x -> do
         time <- liftIO $ getAccessTime $ "/nix/var/nix/profiles" </> T.unpack x
         pure ("/nix/var/nix/profiles" </> T.unpack x, diffUTCTime currentTime time)
-    forM (filter (\(_, time) -> time >= nominalDay * tt) t) $ \(file, _) -> do
-        putLog Alert $ T.pack $ "Link " <> file <> " is older than " <> case timeInDays of
+    forM (filter (\(_, time) -> time >= tt) t) $ \(file, _) -> do
+        putLog Alert $ T.pack $ "Link " <> file <> " is older than " <> case tt / 86400 of
                                                                           1 -> "1 day"
-                                                                          _ -> show timeInDays <> " days"
+                                                                          _ -> show (timeInDays tt) <> " days"
         liftIO $ checkSystems file
 
   where
-    timeInDays :: Int
-    timeInDays = nominalDiffTimeToInt (nominalDay / nominalDay * tt)
+    timeInDays :: NominalDiffTime -> Int
+    timeInDays t = nominalDiffTimeToInt (t / 86400)
 
     nominalDiffTimeToInt :: NominalDiffTime -> Int
     nominalDiffTimeToInt x = do
