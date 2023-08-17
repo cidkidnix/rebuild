@@ -7,6 +7,7 @@ import System.FilePath
 import Rebuild.Helpers
 import Rebuild.Nix
 import Rebuild.Types
+import Rebuild.Flake
 
 buildDarwinSystem :: NixRun e m => NixSettings -> FlakeDef -> m Text
 buildDarwinSystem settings flakedef = do

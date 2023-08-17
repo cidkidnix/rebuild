@@ -67,13 +67,6 @@ getNixArgs settings =
       if isNothing (getProfile settings) then [] else ["--profile", fromJust (getProfile settings)]
     ]
 
-nixBuild :: NixRun e m => NixSettings -> FlakeDef -> m Text
-nixBuild config flakedef = runProcess nixExePath (["build"] <> getNixArgs config <> map T.pack (fromFlakeDef flakedef))
-
-buildSystem :: NixRun e m => NixSettings -> FlakeDef -> m StorePath
-buildSystem settings flakedef = withSpinner "Building system" $ do
-  toStorePath <$> nixBuild settings flakedef
-
 signClosures :: NixRun e m => NixSettings -> StorePath -> Text -> m Text
 signClosures settings path' key = withSpinner ("Signing path " <> fromStorePath path') $ do
   runProcess nixExePath (getNixArgs settings <> ["store", "sign", "-k", key, fromStorePath path'])

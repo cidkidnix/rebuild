@@ -9,7 +9,9 @@ import Rebuild.Flake
 import Rebuild.Helpers
 import Rebuild.Nix
 import Rebuild.GC
+import Rebuild.Legacy
 import Rebuild.Types
+
 
 parseSwitchCommand :: SwitchCommand -> Text
 parseSwitchCommand a = case a of
@@ -27,8 +29,23 @@ runVM path' sys = do
   withSpinner "Running VM.. " $ do
     runProcess (toFilePath path' <> "/bin/run-" <> sys <> "-vm") []
 
+
 legacyBuild :: NixRun e m => Options -> m ()
-legacyBuild _ = failWith "Not implemented yet"
+legacyBuild opts = case opts.com of
+  Build -> do
+    sysbuild <- buildLegacySystem legacySettings (legacyNixOSBuildArgs opts.path "toplevel")
+    putLog Informational ("System Closure at " <> fromStorePath sysbuild)
+  Switch profile -> do
+    checkForUser 0
+    sysbuild <- buildLegacySystem (legacySettings {_profile = Just $ T.pack profile }) (legacyNixOSBuildArgs opts.path "toplevel")
+    _ <- switchToConfig sysbuild S
+    pure ()
+  Boot profile -> do
+    checkForUser 0
+    sysbuild <- buildLegacySystem (legacySettings {_profile = Just $ T.pack profile }) (legacyNixOSBuildArgs opts.path "toplevel")
+    _ <- switchToConfig sysbuild B
+    pure ()
+  _ -> failWith "Not implemented"
 
 flakeBuild :: NixRun e m => Options -> m ()
 flakeBuild opts = case opts.com of

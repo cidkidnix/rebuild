@@ -35,6 +35,7 @@ library
                    Rebuild.GC,
                    Rebuild.Helpers,
                    Rebuild.Nix,
+                   Rebuild.Legacy,
                    Rebuild.Types
 
   if !os(darwin) || !os(osx)

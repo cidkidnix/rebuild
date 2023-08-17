@@ -6,7 +6,6 @@ import Control.Monad.IO.Class
 import Data.Text as T
 import Data.Maybe
 import Data.String
-import Data.Fixed
 import qualified Data.Text.Lazy as T (toStrict)
 import qualified Data.Text.Lazy.Builder as B
 import qualified Data.Text.Lazy.Builder.Int as B
@@ -113,6 +112,7 @@ data StoreURI
   | Daemon
 
 newtype FlakeDef = FlakeDef [String]
+newtype LegacyDef = LegacyDef [String]
 
 newtype StorePath = StorePath Text
 
@@ -127,6 +127,10 @@ class IsNixStore a where
 class IsFlakeDef a where
   fromFlakeDef :: a -> [String]
   toFlakeDef :: String -> String -> String -> String -> a
+
+class IsLegacyDef a where
+  fromLegacyDef :: a -> [String]
+  toLegacyDef :: String -> String -> a
 
 newtype NixStore = NixStore Text
 
@@ -177,6 +181,10 @@ instance IsStorePath Text where
 instance IsFlakeDef FlakeDef where
   fromFlakeDef (FlakeDef s) = s
   toFlakeDef flakepath config name' typ = FlakeDef [flakepath <> "#" <> config <> "." <> name' <> "." <> "config.system.build" <> "." <> typ]
+
+instance IsLegacyDef LegacyDef where
+  fromLegacyDef (LegacyDef s) = s
+  toLegacyDef path' typ = LegacyDef [ "<nixpkgs/nixos>",  "-A",  "config.system.build." <> typ, "-I", "nixos-config=" <> path' ]
 
 instance Show NixError where
   show = \case

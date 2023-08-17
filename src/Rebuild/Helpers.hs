@@ -24,6 +24,9 @@ nixRun severity action = do
 nixExePath :: FilePath
 nixExePath = $(staticWhich "nix")
 
+nixBuildExe :: FilePath
+nixBuildExe = $(staticWhich "nix-build")
+
 nixCollectGarbage :: FilePath
 nixCollectGarbage = $(staticWhich "nix-collect-garbage")
 
@@ -38,6 +41,9 @@ commonNixArgs =
   M.mconcat
     [ ["--option", "sandbox", "true"]
     ]
+
+legacyNixOSBuildArgs :: String -> String -> LegacyDef
+legacyNixOSBuildArgs = toLegacyDef
 
 nixOSBuildargs :: String -> String -> String -> FlakeDef
 nixOSBuildargs flakepath = toFlakeDef flakepath "nixosConfigurations"

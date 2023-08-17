@@ -5,6 +5,7 @@ import qualified Data.Text as T
 import Rebuild.Helpers
 import Rebuild.Nix
 import Rebuild.Types
+import Rebuild.Flake
 
 -- Register remotely
 -- Hopefully can remove if nix ever supports remote profile installs
@@ -21,7 +22,7 @@ deployConfig doSign path' name' host port key = do
             _sshHost = T.pack host,
             _sshPort = Nothing
           }
-  build <- buildSystem defaultSettings (nixOSBuildargs path' name' "toplevel")
+  build <- buildFlakeSystem defaultSettings (nixOSBuildargs path' name' "toplevel")
   _ <- copyDeployment (SSHStoreURI sshURI) name' build
   _ <- installProfileRemote host build
 

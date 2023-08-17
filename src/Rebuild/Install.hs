@@ -4,6 +4,8 @@ import Cli.Extras
 import Control.Monad.IO.Class
 import qualified Data.Text as T
 import System.FilePath
+
+import Rebuild.Flake
 import Rebuild.Helpers
 import Rebuild.Linux
 import Rebuild.Nix
@@ -39,4 +41,4 @@ installToDir root pass path' name' = do
 
 installBuild :: NixRun e m => FlakeDef -> NixSettings -> m StorePath
 installBuild flakedef settings = withSpinner "Installing profile ..." $ do
-  buildSystem settings flakedef
+  buildFlakeSystem settings flakedef
