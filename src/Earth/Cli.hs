@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 {- ORMOLU_DISABLE -}
 
-module Rebuild.Cli
+module Earth.Cli
   ( optsParser,
     versionOption,
     programOptions,
@@ -21,9 +21,9 @@ where
 
 import Cli.Extras
 import Options.Applicative
-import Rebuild.Builders
-import Rebuild.Helpers
-import Rebuild.Types
+import Earth.Builders
+import Earth.Helpers
+import Earth.Types
 
 -- Ugly hacks to get darwin to be the default
 -- and not depend on linux-mount on all platforms
@@ -31,7 +31,7 @@ import Rebuild.Types
 -- since it's not darwin-specific (somewhat)
 #if !defined(darwin_HOST_OS)
 #elif defined(darwin_HOST_OS)
-import Rebuild.Darwin
+import Earth.Darwin
 
 switchTrue :: Mod FlagFields Bool -> Parser Bool
 switchTrue = flag True False
@@ -50,7 +50,7 @@ optsParser hostname =
     ( fullDesc
         <> progDesc "rebuild system"
         <> header
-          "rebuild -- Rebuild your NixOS system!"
+          "rebuild -- Earth your NixOS system!"
     )
 
 versionOption :: Parser (a -> a)
@@ -187,27 +187,3 @@ impl hostname = do
   case legacy opts of
     False -> nixRun severity $ flakeBuild colOpts
     True -> nixRun severity $ legacyBuild colOpts
-
-{-
-  case darwin opts of
-    True -> nixRun severity $ case scommand opts of
-      Switch profile -> darwinBuild (configpath opts) (nixsystem opts) profile "switch"
-      Boot _ -> failWith "Darwin doesn't support boot!"
-      VM -> failWith "Darwin doesn't support VM!"
-      VMWithBootLoader -> failWith "Darwin doesn't support VM with Bootloader!"
-      DryActivate -> failWith "Darwin doesn't support Dry-activate!"
-      NixOSInstall _ _ -> failWith "Darwin doesn't support NixOS installer!"
-      Deploy _ _ _ _ -> failWith "Not currently implemented"
-      Build -> regDarwinBuild (configpath opts) (nixsystem opts) "build"
-      _ -> pure ()
-    False -> nixRun severity $ case scommand opts of
-      Build -> regBuild (configpath opts) (nixsystem opts) "build"
-      VM -> regBuild (configpath opts) (nixsystem opts) "vm"
-      Switch profile -> systemBuild (configpath opts) (nixsystem opts) profile "switch"
-      Boot profile -> systemBuild (configpath opts) (nixsystem opts) profile "boot"
-      VMWithBootLoader -> regBuild (configpath opts) (nixsystem opts) "vm-with-bootloader"
-      DryActivate -> regBuild (configpath opts) (nixsystem opts) "dry-activate"
-      BuildISO -> regBuild (configpath opts) (nixsystem opts) "build-iso"
-      NixOSInstall root pass -> installToDir root pass (configpath opts) (nixsystem opts)
-      Deploy sys port key doSign -> deployConfig doSign (configpath opts) (nixsystem opts) sys port key
--}

@@ -1,7 +1,7 @@
 module Main where
 
 import Network.HostName
-import Rebuild.Cli
+import Earth.Cli
 
 main :: IO ()
 main = do

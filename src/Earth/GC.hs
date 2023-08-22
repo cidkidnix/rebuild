@@ -1,4 +1,4 @@
-module Rebuild.GC where
+module Earth.GC where
 
 import Cli.Extras
 import Control.Monad
@@ -10,8 +10,8 @@ import Data.Time.Clock
 import System.Directory
 import System.FilePath
 
-import Rebuild.Helpers
-import Rebuild.Types
+import Earth.Helpers
+import Earth.Types
 
 data SystemLink = GarbageCollect FilePath
                 | NoCollect FilePath Reason
@@ -53,8 +53,7 @@ runSystemGarbageCollect dryRun fp = do
                           InvalidPath -> pure ()
                           InUse -> putLog Alert $ "Skipping: " <> T.pack f
     unless dryRun $ withSpinner "Running nix-collect-garbage" $ do
-        _ <- runProcess nixCollectGarbage []
-        pure ()
+        void $ runProcess nixCollectGarbage []
 
 timeCollectSystems :: NixRun e m => Text -> m [SystemLink]
 timeCollectSystems timed = do

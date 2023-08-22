@@ -1,4 +1,4 @@
-<h1 align="center">rebuild</h1>
+<h1 align="center">Earth</h1>
 
 <h5 align="center">Re-implementation of nixos-rebuild and darwin-rebuild in haskell</h1>
 

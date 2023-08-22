@@ -1,12 +1,12 @@
-module Rebuild.Nix where
+module Earth.Nix where
 
 import Cli.Extras
 import Data.Maybe
 import Data.Monoid as M
 import Data.Text (Text)
 import qualified Data.Text as T
-import Rebuild.Helpers
-import Rebuild.Types
+import Earth.Helpers
+import Earth.Types
 
 parseStoreUri :: StoreURI -> Text
 parseStoreUri p = case p of
@@ -39,22 +39,6 @@ testS3Store =
       _region = Just "eu-west-1",
       _scheme = Just "https",
       _endpoint = Just "example.com"
-    }
-
-defaultSettings :: NixSettings
-defaultSettings =
-  NixSettings
-    { _options = [],
-      _extraArgs =
-        [ "--print-out-paths",
-          "--no-link"
-        ],
-      _storePath = parseStoreUri Daemon,
-      _experimentalFeatures =
-        [ "flakes",
-          "nix-command"
-        ],
-      _profile = Nothing
     }
 
 getNixArgs :: NixSettings -> [Text]

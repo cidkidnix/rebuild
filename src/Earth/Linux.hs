@@ -1,4 +1,4 @@
-module Rebuild.Linux
+module Earth.Linux
   ( setupDir,
     cleanUpDir,
     withChroot,
@@ -9,8 +9,8 @@ where
 import Data.Monoid as M
 import Data.Text (Text)
 import qualified Data.Text as T
-import Rebuild.Helpers
-import Rebuild.Types
+import Earth.Helpers
+import Earth.Types
 import System.Directory
 import System.FilePath
 import System.Linux.Mount

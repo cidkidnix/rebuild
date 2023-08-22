@@ -1,4 +1,4 @@
-module Rebuild.Types where
+module Earth.Types where
 
 import Cli.Extras
 import Control.Monad.Catch
@@ -22,9 +22,9 @@ data Opts = Opts
   }
 
 data Options = Options
-  { path :: String,
-    name :: String,
-    com :: Command
+  { path :: String
+  , name :: String
+  , com :: Command
   }
 
 data SwitchCommand
@@ -43,6 +43,10 @@ data Command
   | Deploy String String String Bool
   | NixOSInstall String Bool
   | GC Int Int Bool String
+
+-- Default class
+class Default a where
+    def :: a
 
 -- Nix types
 class NixConfig a where
@@ -111,10 +115,24 @@ data StoreURI
   | SSHStoreURI SSHStore
   | Daemon
 
-newtype FlakeDef = FlakeDef [String]
-newtype LegacyDef = LegacyDef [String]
+--newtype Flake = Flake [String]
 
-newtype StorePath = StorePath Text
+data Legacy = Legacy
+    { _lPath :: Text
+    , _lType :: Text
+    } deriving (Show)
+
+data Flake = Flake
+    { _flakePath :: Text
+    , _config :: Text
+    , _name' :: Text
+    , _type' :: Text
+    } deriving (Show)
+
+newtype StorePath = StorePath { unStorePath :: Text }
+
+class NixDefinition a where
+  unNixDef :: a -> [Text]
 
 class IsStorePath a where
   fromStorePath :: a -> Text
@@ -123,14 +141,6 @@ class IsStorePath a where
 
 class IsNixStore a where
   fromNixStore :: a -> Text
-
-class IsFlakeDef a where
-  fromFlakeDef :: a -> [String]
-  toFlakeDef :: String -> String -> String -> String -> a
-
-class IsLegacyDef a where
-  fromLegacyDef :: a -> [String]
-  toLegacyDef :: String -> String -> a
 
 newtype NixStore = NixStore Text
 
@@ -162,6 +172,12 @@ intToText :: Int -> Text
 intToText = T.toStrict . B.toLazyText . B.decimal
 
 -- Instances
+instance NixDefinition Legacy where
+  unNixDef a = [ "<nixpkgs/nixos>", "-A", "config.system.build." <> _lType a, "-I", "nixos-config=" <> _lPath a ]
+
+instance NixDefinition Flake where
+  unNixDef a = [ _flakePath a <> "#" <> _config a <> "." <> _name' a <> "." <> "config.system.build" <> "." <> _type' a ]
+
 instance IsNixStore NixStore where
   fromNixStore (NixStore s) = s
 
@@ -177,14 +193,6 @@ instance IsStorePath Text where
   fromStorePath s = T.filter (/= '\n') (T.filter (/= '"') s)
   toStorePath s = s
   toFilePath = T.unpack
-
-instance IsFlakeDef FlakeDef where
-  fromFlakeDef (FlakeDef s) = s
-  toFlakeDef flakepath config name' typ = FlakeDef [flakepath <> "#" <> config <> "." <> name' <> "." <> "config.system.build" <> "." <> typ]
-
-instance IsLegacyDef LegacyDef where
-  fromLegacyDef (LegacyDef s) = s
-  toLegacyDef path' typ = LegacyDef [ "<nixpkgs/nixos>",  "-A",  "config.system.build." <> typ, "-I", "nixos-config=" <> path' ]
 
 instance Show NixError where
   show = \case
@@ -206,6 +214,22 @@ instance NixConfig NixSettings where
   getExtraArgs = _extraArgs
   getExperimentalFeatures = _experimentalFeatures
   getProfile = _profile
+
+instance Default NixSettings where
+    def = NixSettings
+      { _options = []
+      ,  _extraArgs =
+          [ "--print-out-paths"
+          , "--no-link"
+          ]
+      , _storePath = "daemon"
+      , _experimentalFeatures =
+          [ "flakes"
+          , "nix-command"
+          ]
+      , _profile = Nothing
+      }
+
 
 instance SSHConfig SSHStore where
   getFullUriS p =

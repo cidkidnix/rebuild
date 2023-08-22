@@ -20,12 +20,12 @@
         inherit system;
       };
       proj = marsProject ({ pkgs, ... }: {
-        name = "rebuild";
+        name = "earth";
         src = ./.;
         compiler-nix-name = "ghc926";
         overrides = [
           ({ config, lib, pkgs, ... }: {
-            packages.rebuild.components.library.build-tools = [
+            packages.earth.components.library.build-tools = [
               pkgs.nix
               pkgs.openssh
             ];
@@ -37,11 +37,11 @@
           ghcid = "0.8.8";
         };
         shells = ps: with ps; [
-          rebuild
+          earth
         ];
       });
     in {
-      rebuild = proj.hsPkgs.rebuild.components.exes.rebuild;
+      earth = proj.hsPkgs.earth.components.exes.earth;
       inherit proj;
     });
 

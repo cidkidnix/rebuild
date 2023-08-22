@@ -1,5 +1,5 @@
 cabal-version:      3.0
-name:               rebuild
+name:               earth
 version:            0.1.0.0
 license:            MIT
 license-file:       LICENSE
@@ -24,43 +24,43 @@ library
                     text,
                     time,
                     unix,
-                    which
+                    which,
+                    aeson
 
-  exposed-modules: Rebuild.Basalt,
-                   Rebuild.Builders,
-                   Rebuild.Cli,
-                   Rebuild.Darwin,
-                   Rebuild.Deploy,
-                   Rebuild.Flake,
-                   Rebuild.GC,
-                   Rebuild.Helpers,
-                   Rebuild.Nix,
-                   Rebuild.Legacy,
-                   Rebuild.Types
+  exposed-modules: Earth.Basalt,
+                   Earth.Builders,
+                   Earth.Cli,
+                   Earth.Darwin,
+                   Earth.Deploy,
+                   Earth.Flake,
+                   Earth.GC,
+                   Earth.Helpers,
+                   Earth.Nix,
+                   Earth.Legacy,
+                   Earth.Types
 
   if !os(darwin) || !os(osx)
      build-depends: linux-mount
-     exposed-modules: Rebuild.Install,
-                      Rebuild.Linux
+     exposed-modules: Earth.Install,
+                      Earth.Linux
   hs-source-dirs: src
   default-extensions: ConstraintKinds,
                       FlexibleContexts,
                       ImportQualifiedPost,
                       InstanceSigs,
                       LambdaCase,
-                      OverloadedRecordDot,
                       OverloadedStrings,
                       ScopedTypeVariables,
                       TemplateHaskell
 
   default-language: Haskell2010
 
-executable rebuild
+executable earth
     import:           warnings
     main-is:          Main.hs
     build-depends:    base ^>=4.16.3.0,
                       hostname,
-                      rebuild,
+                      earth,
                       cli-extras,
                       text
 

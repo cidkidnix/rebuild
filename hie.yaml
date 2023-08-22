@@ -1,7 +1,7 @@
 cradle:
   cabal:
     - path: "./src"
-      component: "lib:rebuild"
+      component: "lib:earth"
 
     - path: "./exe/Main.hs"
-      component: "rebuild:exe:rebuild"
+      component: "earth:exe:earth"

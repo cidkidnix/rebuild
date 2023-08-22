@@ -1,16 +1,15 @@
-module Rebuild.Builders where
+module Earth.Builders where
 
 import Cli.Extras
 import Control.Monad
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import Rebuild.Flake
-import Rebuild.Helpers
-import Rebuild.Nix
-import Rebuild.GC
-import Rebuild.Legacy
-import Rebuild.Types
+import Earth.Flake
+import Earth.Helpers
+import Earth.GC
+import Earth.Legacy
+import Earth.Types
 
 
 parseSwitchCommand :: SwitchCommand -> Text
@@ -31,54 +30,45 @@ runVM path' sys = do
 
 
 legacyBuild :: NixRun e m => Options -> m ()
-legacyBuild opts = case opts.com of
+legacyBuild opts = case com opts of
   Build -> do
-    sysbuild <- buildLegacySystem legacySettings (legacyNixOSBuildArgs opts.path "toplevel")
+    sysbuild <- buildLegacySystem legacySettings (legacyNixOSBuildArgs (path opts) "toplevel")
     putLog Informational ("System Closure at " <> fromStorePath sysbuild)
   Switch profile -> do
     checkForUser 0
-    sysbuild <- buildLegacySystem (legacySettings {_profile = Just $ T.pack profile }) (legacyNixOSBuildArgs opts.path "toplevel")
-    _ <- switchToConfig sysbuild S
-    pure ()
+    sysbuild <- buildLegacySystem (legacySettings {_profile = Just $ T.pack profile }) (legacyNixOSBuildArgs (path opts) "toplevel")
+    void $ switchToConfig sysbuild S
   Boot profile -> do
     checkForUser 0
-    sysbuild <- buildLegacySystem (legacySettings {_profile = Just $ T.pack profile }) (legacyNixOSBuildArgs opts.path "toplevel")
-    _ <- switchToConfig sysbuild B
-    pure ()
+    sysbuild <- buildLegacySystem (legacySettings {_profile = Just $ T.pack profile }) (legacyNixOSBuildArgs (path opts) "toplevel")
+    void $ switchToConfig sysbuild B
   _ -> failWith "Not implemented"
 
 flakeBuild :: NixRun e m => Options -> m ()
-flakeBuild opts = case opts.com of
+flakeBuild opts = case com opts of
   Build -> do
-    sysbuild <- buildFlakeSystem defaultSettings (nixOSBuildargs opts.path opts.name "toplevel")
+    sysbuild <- buildFlakeSystem def (nixOSBuildargs (path opts) (name opts) "toplevel")
     putLog Informational ("System Closure at " <> fromStorePath sysbuild)
-    pure ()
   DryActivate -> do
-    sysbuild <- buildFlakeSystem defaultSettings (nixOSBuildargs opts.path opts.name "toplevel")
-    _ <- switchToConfig sysbuild D
-    pure ()
+    sysbuild <- buildFlakeSystem def (nixOSBuildargs (path opts) (name opts) "toplevel")
+    void $ switchToConfig sysbuild D
   VM -> do
-    sysbuild <- buildFlakeSystem defaultSettings (nixOSBuildargs opts.path opts.name "vm")
-    _ <- runVM sysbuild opts.name
-    pure ()
+    sysbuild <- buildFlakeSystem def (nixOSBuildargs (path opts) (name opts) "vm")
+    void $ runVM sysbuild (name opts)
   VMWithBootLoader -> do
-    sysbuild <- buildFlakeSystem defaultSettings (nixOSBuildargs opts.path opts.name "vmWithBootLoader")
-    _ <- runVM sysbuild opts.name
-    pure ()
+    sysbuild <- buildFlakeSystem def (nixOSBuildargs (path opts) (name opts) "vmWithBootLoader")
+    void $ runVM sysbuild (name opts)
   BuildISO -> do
-    sysbuild <- buildFlakeSystem defaultSettings (nixOSBuildargs opts.path opts.name "isoImage")
+    sysbuild <- buildFlakeSystem def (nixOSBuildargs (path opts) (name opts) "isoImage")
     putLog Informational ("ISO image at " <> fromStorePath sysbuild)
-    pure ()
   Switch profile -> do
     checkForUser 0
-    sysbuild <- buildFlakeSystem (defaultSettings {_profile = Just (T.pack profile)}) (nixOSBuildargs opts.path opts.name "toplevel")
-    _ <- switchToConfig sysbuild S
-    pure ()
+    sysbuild <- buildFlakeSystem (def {_profile = Just (T.pack profile)}) (nixOSBuildargs (path opts) (name opts) "toplevel")
+    void $ switchToConfig sysbuild S
   Boot profile -> do
     checkForUser 0
-    sysbuild <- buildFlakeSystem (defaultSettings {_profile = Just (T.pack profile)}) (nixOSBuildargs opts.path opts.name "toplevel")
-    _ <- switchToConfig sysbuild B
-    pure ()
+    sysbuild <- buildFlakeSystem (def {_profile = Just (T.pack profile)}) (nixOSBuildargs (path opts) (name opts) "toplevel")
+    void $ switchToConfig sysbuild B
   GC f t dryRun olderThan -> do
     a <- case textToMaybeInteger (T.pack olderThan) of
                       Nothing -> failWith "Need to be <num>d"
