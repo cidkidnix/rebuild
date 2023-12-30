@@ -9,12 +9,28 @@
 
   outputs = inputs: let
     lib = import "${inputs.nixpkgs}/lib";
+    pkgs'' = inputs.nixpkgs.legacyPackages.x86_64-linux;
     supportedSystems = lib.genAttrs [
       "x86_64-linux"
       "aarch64-linux"
       "x86_64-darwin"
     ];
   in rec {
+    hydraJobs = rec {
+      recurseForDerivations = true;
+      build = supportedSystems (system: packages."${system}".earth);
+      projects = supportedSystems (system: packages."${system}".proj);
+      devShells = pkgs''.releaseTools.aggregate
+        { name = "earth-devshells";
+          constituents = [ projects.x86_64-linux.shells.ghc ];
+          meta.description = "Earth DevShells";
+        };
+      release = pkgs''.releaseTools.aggregate
+        { name = "earth";
+          constituents = [ build.x86_64-linux ];
+          meta.description = "Earth build";
+        };
+    };
     packages = supportedSystems (system: let
       marsProject = import inputs.mars {
         inherit system;
@@ -33,8 +49,6 @@
         ];
         shellTools = {
           cabal = "3.6.2.0";
-          haskell-language-server = "1.9.1.0";
-          ghcid = "0.8.8";
         };
         shells = ps: with ps; [
           earth
