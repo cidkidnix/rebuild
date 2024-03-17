@@ -12,13 +12,14 @@ import Earth.Legacy
 import Earth.Types
 
 
-parseSwitchCommand :: SwitchCommand -> Text
+parseSwitchCommand :: Command -> Text
 parseSwitchCommand a = case a of
-  B -> "boot"
-  S -> "switch"
-  D -> "dry-activate"
+  Boot _ -> "boot"
+  Switch _ -> "switch"
+  DryActivate -> "dry-activate"
+  _ -> error "Earth.Builders:parseSwitchCommand: not supported!"
 
-switchToConfig :: NixRun e m => StorePath -> SwitchCommand -> m Text
+switchToConfig :: NixRun e m => StorePath -> Command -> m Text
 switchToConfig path' arg = do
   withSpinner ("Switching to " <> fromStorePath path') $ do
     runProcess (toFilePath path' <> "/bin/switch-to-configuration") [parseSwitchCommand arg]
@@ -28,63 +29,36 @@ runVM path' sys = do
   withSpinner "Running VM.. " $ do
     runProcess (toFilePath path' <> "/bin/run-" <> sys <> "-vm") []
 
-
 legacyBuild :: NixRun e m => Options -> m ()
-legacyBuild opts = case com opts of
-  Build -> do
-    sysbuild <- buildLegacySystem legacySettings (legacyNixOSBuildArgs (path opts) "toplevel")
-    putLog Informational ("System Closure at " <> fromStorePath sysbuild)
-  Switch profile -> do
-    checkForUser 0
-    sysbuild <- buildLegacySystem (legacySettings {_profile = Just $ T.pack profile }) (legacyNixOSBuildArgs (path opts) "toplevel")
-    void $ switchToConfig sysbuild S
-  Boot profile -> do
-    checkForUser 0
-    sysbuild <- buildLegacySystem (legacySettings {_profile = Just $ T.pack profile }) (legacyNixOSBuildArgs (path opts) "toplevel")
-    void $ switchToConfig sysbuild B
-  _ -> failWith "Not implemented"
+legacyBuild opts = stub
 
 flakeBuild :: NixRun e m => Options -> m ()
 flakeBuild opts = case com opts of
-  Build -> do
-    sysbuild <- buildFlakeSystem def (nixOSBuildargs (path opts) (name opts) "toplevel")
-    putLog Informational ("System Closure at " <> fromStorePath sysbuild)
-  DryActivate -> do
-    sysbuild <- buildFlakeSystem def (nixOSBuildargs (path opts) (name opts) "toplevel")
-    void $ switchToConfig sysbuild D
-  VM -> do
-    sysbuild <- buildFlakeSystem def (nixOSBuildargs (path opts) (name opts) "vm")
-    void $ runVM sysbuild (name opts)
-  VMWithBootLoader -> do
-    sysbuild <- buildFlakeSystem def (nixOSBuildargs (path opts) (name opts) "vmWithBootLoader")
-    void $ runVM sysbuild (name opts)
-  BuildISO -> do
-    sysbuild <- buildFlakeSystem def (nixOSBuildargs (path opts) (name opts) "isoImage")
-    putLog Informational ("ISO image at " <> fromStorePath sysbuild)
-  Switch profile -> do
-    checkForUser 0
-    sysbuild <- buildFlakeSystem (def {_profile = Just (T.pack profile)}) (nixOSBuildargs (path opts) (name opts) "toplevel")
-    void $ switchToConfig sysbuild S
-  Boot profile -> do
-    checkForUser 0
-    sysbuild <- buildFlakeSystem (def {_profile = Just (T.pack profile)}) (nixOSBuildargs (path opts) (name opts) "toplevel")
-    void $ switchToConfig sysbuild B
-  GC f t dryRun olderThan -> do
-    a <- case textToMaybeInteger (T.pack olderThan) of
-                      Nothing -> failWith "Need to be <num>d"
-                      Just a -> pure a
-    let olderThanNum = timeToSeconds a
-    unless dryRun $
-        checkForUser 0
+    GC f t dryRun olderThan -> do
+      time <- case textToMaybeInteger (T.pack olderThan) of
+                        Nothing -> failWith "Need to be <num>d"
+                        Just a -> pure a
+      let olderThanNum = timeToSeconds time
+      unless dryRun $
+          checkForUser 0
 
-    when (f /= 0 && t /= 0 && olderThanNum == 0) $ do
-        filepaths <- collectSystems f t
-        runSystemGarbageCollect dryRun filepaths
+      when (f /= 0 && t /= 0 && olderThanNum == 0) $ do
+          filepaths <- collectSystems f t
+          runSystemGarbageCollect dryRun filepaths
 
-    when (olderThanNum /= 0) $ do
-        fps <- timeCollectSystems $ T.pack olderThan
-        case fps of
-          [] -> do putLog Alert "Nothing to do!"
-          _ -> runSystemGarbageCollect dryRun fps
-
-  _ -> pure ()
+      when (olderThanNum /= 0) $ do
+          fps <- timeCollectSystems $ T.pack olderThan
+          case fps of
+            [] -> do putLog Alert "Nothing to do!"
+            _ -> runSystemGarbageCollect dryRun fps
+    NixOSInstall _ _ -> stub
+    buildRequired -> do
+      let buildCmd = toFlakeBuildArgs opts
+          profileArgs = toFlakeProfileArgs (com opts)
+      build <- buildFlakeSystem profileArgs buildCmd
+      case buildRequired of
+        Build -> putLog Informational ("System Closure at " <> fromStorePath build)
+        VM -> void $ runVM build (name opts)
+        VMWithBootLoader -> void $ runVM build (name opts)
+        BuildISO -> putLog Informational ("ISO image at " <> fromStorePath build)
+        _ -> void $ switchToConfig build (com opts)

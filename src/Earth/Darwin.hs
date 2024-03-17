@@ -16,8 +16,8 @@ buildDarwinSystem settings flakedef = do
 
 switchToConfig :: NixRun e m => Text -> m Text
 switchToConfig path' = do
-  withSpinner ("Switching to " <> fromStorePath path') $ do
-    runProcess (toFilePath path' </> "activate") []
+  withSpinner ("Switching to " <> path') $ do
+    runProcess (T.unpack path' </> "activate") []
 
 darwinBuild :: NixRun e m => String -> String -> String -> String -> m ()
 darwinBuild path' name' profile arg = case arg of
@@ -31,7 +31,7 @@ regDarwinBuild :: NixRun e m => String -> String -> String -> m ()
 regDarwinBuild path' name' arg = case arg of
   "build" -> do
     sysbuild <- buildDarwinSystem def (nixDarwinBuildargs path' name' "toplevel")
-    putLog Informational ("System Closure at " <> fromStorePath sysbuild)
+    putLog Informational ("System Closure at " <> sysbuild)
   _ -> pure ()
 
 installToDir :: NixRun e m => String -> Bool -> String -> String -> m ()

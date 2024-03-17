@@ -32,7 +32,7 @@ instance FromJSON DeployConfig
 
 -- Register remotely
 -- Hopefully can remove if nix ever supports remote profile installs
-installProfileRemote :: NixRun e m => String -> StorePath -> m OtherOutput
+installProfileRemote :: NixRun e m => String -> StorePath -> m Text
 installProfileRemote host outpath = do
   withSpinner ("Installing system to" <> T.pack host) $ do
     runProcessWithSSH "22" host ["-t"] ["nix profile install ", fromStorePath outpath, " --profile /nix/var/nix/profiles/test"]

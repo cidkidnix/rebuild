@@ -27,11 +27,6 @@ data Options = Options
   , com :: Command
   }
 
-data SwitchCommand
-  = B
-  | S
-  | D
-
 data Command
   = Build
   | VM
@@ -134,18 +129,6 @@ newtype StorePath = StorePath { unStorePath :: Text }
 class NixDefinition a where
   unNixDef :: a -> [Text]
 
-class IsStorePath a where
-  fromStorePath :: a -> Text
-  toStorePath :: Text -> a
-  toFilePath :: a -> FilePath
-
-class IsNixStore a where
-  fromNixStore :: a -> Text
-
-newtype NixStore = NixStore Text
-
-type OtherOutput = StorePath
-
 data NixError
   = P ProcessFailure
   | T Text
@@ -178,21 +161,8 @@ instance NixDefinition Legacy where
 instance NixDefinition Flake where
   unNixDef a = [ _flakePath a <> "#" <> _config a <> "." <> _name' a <> "." <> "config.system.build" <> "." <> _type' a ]
 
-instance IsNixStore NixStore where
-  fromNixStore (NixStore s) = s
-
 instance IsString StorePath where
   fromString x = StorePath (T.pack x)
-
-instance IsStorePath StorePath where
-  fromStorePath (StorePath s) = T.filter (/= '\n') (T.filter (/= '"') s)
-  toStorePath = StorePath
-  toFilePath x = T.unpack (fromStorePath x)
-
-instance IsStorePath Text where
-  fromStorePath s = T.filter (/= '\n') (T.filter (/= '"') s)
-  toStorePath s = s
-  toFilePath = T.unpack
 
 instance Show NixError where
   show = \case

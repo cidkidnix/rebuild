@@ -42,20 +42,56 @@ commonNixArgs =
     [ ["--option", "sandbox", "true"]
     ]
 
+stub :: NixRun e m => m ()
+stub = failWith "TODO"
+
+toAttrPathBuild :: Command -> String
+toAttrPathBuild = \case
+  Switch _ -> "toplevel"
+  Boot _ -> "toplevel"
+  Build -> "toplevel"
+  DryActivate -> "toplevel"
+  VM -> "vm"
+  VMWithBootLoader -> "vmWithBootLoader"
+  BuildISO -> "isoImage"
+  _ -> error "Doesn't have an attrPath!"
+
+stripPaths :: Text -> Text
+stripPaths = T.strip . T.filter (/= '\n')
+
+toStorePath :: Text -> StorePath
+toStorePath = StorePath
+
+fromStorePath :: StorePath -> Text
+fromStorePath = stripPaths . unStorePath
+
+toFilePath :: StorePath -> FilePath
+toFilePath = T.unpack . stripPaths . unStorePath
+
 legacyNixOSBuildArgs :: String -> String -> Legacy
 legacyNixOSBuildArgs a b = Legacy { _lPath = T.pack a, _lType = T.pack b }
 
 nixOSBuildargs :: String -> String -> String -> Flake
-nixOSBuildargs flakepath name_ typ = Flake { _flakePath = T.pack flakepath, _config = "nixosConfigurations", _name' = T.pack name_, _type' = T.pack typ }
+nixOSBuildargs flakepath name_ typ = Flake
+    { _flakePath = T.pack flakepath
+    , _config = "nixosConfigurations"
+    , _name' = T.pack name_
+    , _type' = T.pack typ
+    }
 
 nixDarwinBuildargs :: String -> String -> String -> Flake
-nixDarwinBuildargs flakepath name_ typ = Flake { _flakePath = T.pack flakepath, _config = "darwinConfigurations", _name' = T.pack name_, _type' = T.pack typ }
+nixDarwinBuildargs flakepath name_ typ = Flake
+    { _flakePath = T.pack flakepath
+    , _config = "darwinConfigurations"
+    , _name' = T.pack name_
+    , _type' = T.pack typ
+    }
 
 runProcess :: NixRun e m => FilePath -> [Text] -> m Text
 runProcess com' args = do
-  toStorePath <$> readProcessAndLogOutput (Debug, Debug) (proc com' (map T.unpack args))
+  readProcessAndLogOutput (Debug, Debug) (proc com' (map T.unpack args))
 
-runProcessWithSSH :: NixRun e m => String -> String -> [String] -> [Text] -> m OtherOutput
+runProcessWithSSH :: NixRun e m => String -> String -> [String] -> [Text] -> m Text
 runProcessWithSSH port host sargs com' = do
   let pargs' = T.unwords com'
       cmd = sshExePath
@@ -65,7 +101,7 @@ runProcessWithSSH port host sargs com' = do
             [host, "-p", port],
             [T.unpack pargs']
           ]
-  toStorePath <$> readProcessAndLogOutput (Debug, Debug) (proc cmd args')
+  readProcessAndLogOutput (Debug, Debug) (proc cmd args')
 
 withSSH :: NixRun e m => String -> String -> [String] -> [[Text]] -> m ()
 withSSH port host sargs com' = forM_ com' $ \x ->
@@ -80,10 +116,10 @@ textToMaybeInteger :: Text -> Maybe (Integer, Time)
 textToMaybeInteger days = case T.decimal days of
             Left _ -> Nothing
             Right (num, letter) -> case letter of
-                                     "d" -> Just (num, Day)
-                                     "w" -> Just (num, Week)
-                                     "m" -> Just (num, Month)
-                                     _ -> Nothing
+              "d" -> Just (num, Day)
+              "w" -> Just (num, Week)
+              "m" -> Just (num, Month)
+              _ -> Nothing
 
 data Time = Day
           | Week
